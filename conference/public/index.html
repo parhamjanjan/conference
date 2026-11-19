@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -824,9 +823,7 @@ button {
 }
 
 @media(prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
+    *, *::before, *::after {
         animation-duration: .01ms !important;
         transition-duration: .01ms !important;
     }
@@ -1045,6 +1042,8 @@ let userId = "";
 let userName = "";
 let roomName = "";
 
+// cameraStream → فقط برای MediaPipe / presence
+// shareStream  → فقط برای WebRTC (کاملاً مستقل)
 let cameraStream = null;
 let shareStream = null;
 
@@ -1054,7 +1053,6 @@ let isPresent = false;
 
 let faceDetector = null;
 let detectionLoop = false;
-let lastDetectionTime = 0;
 let lastPresentTime = 0;
 let lastSaveTime = 0;
 
@@ -1065,14 +1063,10 @@ const incomingCalls = new Map();
 const remoteMembers = new Map();
 const remoteProfiles = new Map();
 
-let ownStats = {
-    version: 1,
-    days: {}
-};
+let ownStats = { version: 1, days: {} };
 
 const STATS_KEY = "focus_hall_stats_";
 const REMOTE_KEY = "focus_hall_remote_profiles";
-
 const PROFILE_SYNC_INTERVAL = 15000;
 
 /* =========================================
@@ -1084,17 +1078,11 @@ function setStatus(message, isError = false) {
     statusMsg.classList.toggle("error-text", isError);
 }
 
-function escapeText(value) {
-    return String(value ?? "");
-}
-
 function formatTime(seconds) {
     seconds = Math.max(0, Math.floor(seconds || 0));
-
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-
     return [
         String(hours).padStart(2, "0"),
         String(minutes).padStart(2, "0"),
@@ -1109,9 +1097,7 @@ function tehranDate(date = new Date()) {
         month: "2-digit",
         day: "2-digit"
     }).formatToParts(date);
-
     const get = type => parts.find(p => p.type === type)?.value;
-
     return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
@@ -1124,49 +1110,29 @@ function shiftDate(dateString, amount) {
 function getWeekDates() {
     const today = tehranDate();
     const date = new Date(`${today}T00:00:00Z`);
-
     const weekday = date.getUTCDay();
     const daysSinceMonday = (weekday + 6) % 7;
-
     const monday = shiftDate(today, -daysSinceMonday);
-
     const result = [];
-
     for (let i = 0; i <= daysSinceMonday; i++) {
         result.push(shiftDate(monday, i));
     }
-
     return result;
 }
 
 function getPeriodSeconds(days, period) {
     if (!days || typeof days !== "object") return 0;
-
-    if (period === "today") {
-        return Number(days[tehranDate()] || 0);
-    }
-
-    if (period === "yesterday") {
-        return Number(days[shiftDate(tehranDate(), -1)] || 0);
-    }
-
+    if (period === "today") return Number(days[tehranDate()] || 0);
+    if (period === "yesterday") return Number(days[shiftDate(tehranDate(), -1)] || 0);
     if (period === "week") {
-        return getWeekDates().reduce(
-            (sum, date) => sum + Number(days[date] || 0),
-            0
-        );
+        return getWeekDates().reduce((sum, date) => sum + Number(days[date] || 0), 0);
     }
-
-    return Object.values(days).reduce(
-        (sum, value) => sum + Number(value || 0),
-        0
-    );
+    return Object.values(days).reduce((sum, value) => sum + Number(value || 0), 0);
 }
 
 async function hashPassword(password) {
     const data = new TextEncoder().encode(password);
     const digest = await crypto.subtle.digest("SHA-256", data);
-
     return Array.from(new Uint8Array(digest))
         .map(byte => byte.toString(16).padStart(2, "0"))
         .join("");
@@ -1175,15 +1141,10 @@ async function hashPassword(password) {
 function loadOwnStats() {
     try {
         const raw = localStorage.getItem(STATS_KEY + userId);
-
         if (raw) {
             const parsed = JSON.parse(raw);
-
             if (parsed && parsed.days && typeof parsed.days === "object") {
-                ownStats = {
-                    version: 1,
-                    days: parsed.days
-                };
+                ownStats = { version: 1, days: parsed.days };
             }
         }
     } catch (error) {
@@ -1193,10 +1154,7 @@ function loadOwnStats() {
 
 function saveOwnStats() {
     try {
-        localStorage.setItem(
-            STATS_KEY + userId,
-            JSON.stringify(ownStats)
-        );
+        localStorage.setItem(STATS_KEY + userId, JSON.stringify(ownStats));
     } catch (error) {
         console.warn("Could not save study statistics:", error);
     }
@@ -1206,7 +1164,6 @@ function loadRemoteProfiles() {
     try {
         const raw = localStorage.getItem(REMOTE_KEY);
         const parsed = raw ? JSON.parse(raw) : {};
-
         if (parsed && typeof parsed === "object") {
             Object.entries(parsed).forEach(([id, profile]) => {
                 if (id !== userId && profile && profile.data) {
@@ -1222,11 +1179,7 @@ function loadRemoteProfiles() {
 function saveRemoteProfiles() {
     try {
         const data = {};
-
-        remoteProfiles.forEach((profile, id) => {
-            data[id] = profile;
-        });
-
+        remoteProfiles.forEach((profile, id) => { data[id] = profile; });
         localStorage.setItem(REMOTE_KEY, JSON.stringify(data));
     } catch (error) {
         console.warn("Could not save remote profiles:", error);
@@ -1235,20 +1188,12 @@ function saveRemoteProfiles() {
 
 function mergeDays(oldDays, newDays) {
     const merged = { ...(oldDays || {}) };
-
     for (const [date, seconds] of Object.entries(newDays || {})) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-
         const value = Number(seconds);
-
         if (!Number.isFinite(value) || value < 0) continue;
-
-        merged[date] = Math.max(
-            Number(merged[date] || 0),
-            Math.floor(value)
-        );
+        merged[date] = Math.max(Number(merged[date] || 0), Math.floor(value));
     }
-
     return merged;
 }
 
@@ -1258,22 +1203,16 @@ function mergeDays(oldDays, newDays) {
 
 function sendMyProfile() {
     if (!socket?.connected || !userId) return;
-
     socket.emit("study-profile", {
-        data: {
-            version: 1,
-            days: ownStats.days
-        }
+        data: { version: 1, days: ownStats.days }
     });
 }
 
 function receiveProfile(payload) {
     if (!payload || !payload.userId || payload.userId === userId) return;
-
     if (!payload.data || typeof payload.data !== "object") return;
 
     const existing = remoteProfiles.get(payload.userId);
-
     const mergedDays = mergeDays(
         existing?.data?.days || {},
         payload.data.days || {}
@@ -1281,18 +1220,11 @@ function receiveProfile(payload) {
 
     remoteProfiles.set(payload.userId, {
         name: payload.name || existing?.name || "Participant",
-        data: {
-            version: 1,
-            days: mergedDays
-        }
+        data: { version: 1, days: mergedDays }
     });
 
     saveRemoteProfiles();
     renderLeaderboard();
-}
-
-function answerProfileRequest() {
-    sendMyProfile();
 }
 
 /* =========================================
@@ -1301,7 +1233,6 @@ function answerProfileRequest() {
 
 function createVideoTile(id, name, isMe = false) {
     let tile = document.getElementById(`tile-${id}`);
-
     if (tile) return tile;
 
     tile = document.createElement("div");
@@ -1338,7 +1269,6 @@ function createVideoTile(id, name, isMe = false) {
     nameText.textContent = isMe ? `${name} (You)` : name;
 
     nameTag.append(dot, nameText);
-
     tile.append(placeholder, video, nameTag);
 
     if (isMe) {
@@ -1350,7 +1280,6 @@ function createVideoTile(id, name, isMe = false) {
     }
 
     videoGrid.appendChild(tile);
-
     return tile;
 }
 
@@ -1361,6 +1290,14 @@ function setTileStream(id, stream) {
     const video = tile.querySelector("video");
 
     if (!stream) {
+        video.srcObject = null;
+        tile.classList.remove("has-video");
+        return;
+    }
+
+    // اگر track ویدیو زنده نیست، tile را "has-video" نکن
+    const hasLiveVideo = stream.getVideoTracks().some(t => t.readyState === "live");
+    if (!hasLiveVideo) {
         video.srcObject = null;
         tile.classList.remove("has-video");
         return;
@@ -1382,7 +1319,6 @@ function removeVideoTile(id) {
 
 function renderMembers() {
     const members = [];
-
     members.push({
         peerId: myId,
         userId,
@@ -1393,10 +1329,7 @@ function renderMembers() {
     });
 
     remoteMembers.forEach(member => {
-        members.push({
-            ...member,
-            me: false
-        });
+        members.push({ ...member, me: false });
     });
 
     memberCount.textContent = String(members.length);
@@ -1444,16 +1377,10 @@ function renderMembers() {
 
 function renderLeaderboard() {
     const participants = [];
-
-    participants.push({
-        id: userId,
-        name: userName,
-        days: ownStats.days
-    });
+    participants.push({ id: userId, name: userName, days: ownStats.days });
 
     remoteProfiles.forEach((profile, id) => {
         const member = remoteMembers.get(id);
-
         participants.push({
             id,
             name: member?.name || profile.name || "Participant",
@@ -1504,7 +1431,6 @@ document.querySelectorAll(".period-tab").forEach(button => {
         document.querySelectorAll(".period-tab").forEach(item => {
             item.classList.remove("active");
         });
-
         button.classList.add("active");
         selectedPeriod = button.dataset.period;
         renderLeaderboard();
@@ -1512,7 +1438,7 @@ document.querySelectorAll(".period-tab").forEach(button => {
 });
 
 /* =========================================
-   CAMERA CAPTURE
+   CAMERA (Presence — MediaPipe)
 ========================================= */
 
 async function ensureCameraStream() {
@@ -1535,26 +1461,63 @@ async function ensureCameraStream() {
     });
 
     presenceVideo.srcObject = cameraStream;
-
     await presenceVideo.play().catch(() => {});
-
     return cameraStream;
 }
 
 function releaseCameraIfUnused() {
-    if (isStudying || isCamOn) return;
-
+    if (isStudying) return;  // MediaPipe ممکن است به آن نیاز داشته باشد
     if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
         cameraStream = null;
     }
-
     presenceVideo.srcObject = null;
 }
 
 /* =========================================
-   CAMERA SHARING
+   CAMERA (Sharing — WebRTC)
+   Stream مستقل از cameraStream
 ========================================= */
+
+async function ensureShareStream() {
+    if (shareStream && shareStream.getVideoTracks().some(t => t.readyState === "live")) {
+        return shareStream;
+    }
+
+    try {
+        // تلاش اول: getUserMedia مستقل
+        shareStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 360 },
+                frameRate: { ideal: 24, max: 30 },
+                facingMode: "user"
+            }
+        });
+    } catch (primaryError) {
+        console.warn("Independent getUserMedia failed, falling back to clone:", primaryError);
+
+        // fallback: clone از cameraStream
+        await ensureCameraStream();
+        const liveTracks = cameraStream.getVideoTracks()
+            .filter(t => t.readyState === "live");
+
+        if (!liveTracks.length) {
+            throw new Error("No live video track available.");
+        }
+
+        const cloned = liveTracks.map(t => t.clone());
+        shareStream = new MediaStream(cloned);
+    }
+
+    // مطمئن شوید trackها واقعاً live هستند
+    if (!shareStream.getVideoTracks().some(t => t.readyState === "live")) {
+        throw new Error("Camera produced no live video track.");
+    }
+
+    return shareStream;
+}
 
 function updateCameraButton() {
     toggleBtn.classList.toggle("active", isCamOn);
@@ -1563,27 +1526,16 @@ function updateCameraButton() {
 
 function updateMyCameraStatus() {
     if (socket?.connected) {
-        socket.emit("cam-status", {
-            camOn: isCamOn
-        });
+        socket.emit("cam-status", { camOn: isCamOn });
     }
-
     renderMembers();
 }
 
 async function startCameraSharing() {
     try {
-        await ensureCameraStream();
+        await ensureShareStream();
 
-        const tracks = cameraStream.getVideoTracks()
-            .filter(track => track.readyState === "live")
-            .map(track => track.clone());
-
-        if (!tracks.length) {
-            throw new Error("No active camera track was found.");
-        }
-
-        shareStream = new MediaStream(tracks);
+        // ✅ isCamOn را زودتر ست کنید تا socket handlerها ببینند
         isCamOn = true;
 
         createVideoTile(myId, userName, true);
@@ -1592,13 +1544,15 @@ async function startCameraSharing() {
         updateCameraButton();
         updateMyCameraStatus();
 
+        // برای همه‌ی اعضای موجود call بزنید
         for (const member of remoteMembers.values()) {
-            callPeer(member.peerId);
+            if (member.peerId) callPeer(member.peerId);
         }
 
         setStatus("Your camera is now being shared.");
     } catch (error) {
         console.error(error);
+        isCamOn = false;
         setStatus(error.message || "Could not start camera sharing.", true);
     }
 }
@@ -1611,17 +1565,12 @@ function stopCameraSharing() {
         shareStream = null;
     }
 
-    outgoingCalls.forEach(call => {
-        try { call.close(); } catch {}
-    });
-
+    outgoingCalls.forEach(call => { try { call.close(); } catch {} });
     outgoingCalls.clear();
 
     setTileStream(myId, null);
-
     updateCameraButton();
     updateMyCameraStatus();
-
     releaseCameraIfUnused();
 
     setStatus("Camera sharing stopped. Your study session can continue.");
@@ -1641,26 +1590,42 @@ toggleBtn.addEventListener("click", async () => {
 
 function callPeer(remotePeerId) {
     if (!peer || !shareStream || !remotePeerId || remotePeerId === myId) return;
+
+    // ✅ بررسی زنده بودن peer — جلوگیری از خطای Cannot connect to new Peer
+    if (peer.destroyed || peer.disconnected || peer.open === false) {
+        console.warn("Peer not ready — skipping call to", remotePeerId);
+        return;
+    }
+
     if (outgoingCalls.has(remotePeerId)) return;
 
     try {
         const call = peer.call(remotePeerId, shareStream);
-
         if (!call) return;
 
         outgoingCalls.set(remotePeerId, call);
+
+        call.on("stream", (remoteStream) => {
+            setTileStream(remotePeerId, remoteStream);
+        });
 
         call.on("close", () => {
             if (outgoingCalls.get(remotePeerId) === call) {
                 outgoingCalls.delete(remotePeerId);
             }
+            // tile را پاک نکنید — فقط stream را null کنید
+            const tile = document.getElementById(`tile-${remotePeerId}`);
+            if (tile) {
+                tile.classList.remove("has-video");
+                const v = tile.querySelector("video");
+                if (v) v.srcObject = null;
+            }
         });
 
-        call.on("error", error => {
+        call.on("error", (error) => {
             console.warn("Outgoing call error:", error);
             outgoingCalls.delete(remotePeerId);
         });
-
     } catch (error) {
         console.warn("Could not call peer:", error);
     }
@@ -1673,7 +1638,7 @@ function handleIncomingCall(call) {
         call.answer(shareStream || undefined);
         incomingCalls.set(remotePeerId, call);
 
-        call.on("stream", stream => {
+        call.on("stream", (stream) => {
             setTileStream(remotePeerId, stream);
         });
 
@@ -1681,14 +1646,17 @@ function handleIncomingCall(call) {
             if (incomingCalls.get(remotePeerId) === call) {
                 incomingCalls.delete(remotePeerId);
             }
-
-            setTileStream(remotePeerId, null);
+            const tile = document.getElementById(`tile-${remotePeerId}`);
+            if (tile) {
+                tile.classList.remove("has-video");
+                const v = tile.querySelector("video");
+                if (v) v.srcObject = null;
+            }
         });
 
-        call.on("error", error => {
+        call.on("error", (error) => {
             console.warn("Incoming call error:", error);
         });
-
     } catch (error) {
         console.error("Could not answer call:", error);
     }
@@ -1713,15 +1681,15 @@ function removePeer(peerId) {
 
 function setupSocket() {
     socket = io({
-    transports: ["polling", "websocket"],
-    upgrade: true,
-    rememberUpgrade: true,
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    timeout: 20000
-});
+        transports: ["polling", "websocket"],  // polling اول، بعد upgrade
+        upgrade: true,
+        rememberUpgrade: true,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000
+    });
 
     socket.on("connect", () => {
         socket.emit("join", {
@@ -1754,8 +1722,8 @@ function setupSocket() {
 
             createVideoTile(member.peerId, member.name || "Participant");
 
-            if (isCamOn) {
-                callPeer(member.peerId);
+            if (isCamOn && shareStream) {
+                setTimeout(() => callPeer(member.peerId), 300);
             }
         });
 
@@ -1773,8 +1741,8 @@ function setupSocket() {
 
         createVideoTile(member.peerId, member.name || "Participant");
 
-        if (isCamOn) {
-            callPeer(member.peerId);
+        if (isCamOn && shareStream) {
+            setTimeout(() => callPeer(member.peerId), 300);
         }
 
         renderMembers();
@@ -1783,45 +1751,28 @@ function setupSocket() {
 
     socket.on("peer-left", member => {
         if (!member) return;
-
         removePeer(member.peerId);
-
         if (member.userId) {
             remoteMembers.delete(member.userId);
         }
-
         renderMembers();
         renderLeaderboard();
     });
 
     socket.on("peer-cam-status", payload => {
         if (!payload) return;
-
         const member = [...remoteMembers.values()]
             .find(item => item.peerId === payload.peerId);
-
-        if (member) {
-            member.camOn = payload.camOn === true;
-        }
-
+        if (member) member.camOn = payload.camOn === true;
         const dot = document.getElementById(`dot-${payload.peerId}`);
-
-        if (dot) {
-            dot.classList.toggle("on", payload.camOn === true);
-        }
-
+        if (dot) dot.classList.toggle("on", payload.camOn === true);
         renderMembers();
     });
 
     socket.on("peer-study-status", payload => {
         if (!payload) return;
-
         const member = remoteMembers.get(payload.userId);
-
-        if (member) {
-            member.studying = payload.studying === true;
-        }
-
+        if (member) member.studying = payload.studying === true;
         renderMembers();
     });
 
@@ -1830,14 +1781,8 @@ function setupSocket() {
 
         members.forEach(member => {
             if (!member?.userId || member.userId === userId) return;
-
             const old = remoteMembers.get(member.userId) || {};
-
-            remoteMembers.set(member.userId, {
-                ...old,
-                ...member
-            });
-
+            remoteMembers.set(member.userId, { ...old, ...member });
             if (member.peerId) {
                 createVideoTile(member.peerId, member.name || "Participant");
             }
@@ -1861,13 +1806,8 @@ function setupSocket() {
         renderLeaderboard();
     });
 
-    socket.on("study-profile-request", () => {
-        answerProfileRequest();
-    });
-
-    socket.on("study-profile", payload => {
-        receiveProfile(payload);
-    });
+    socket.on("study-profile-request", () => sendMyProfile());
+    socket.on("study-profile", payload => receiveProfile(payload));
 }
 
 /* =========================================
@@ -1896,17 +1836,11 @@ async function initializeFaceDetector() {
 
 function addStudySeconds(seconds) {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
-
     const today = tehranDate();
-
     ownStats.days[today] = Math.floor(
         Number(ownStats.days[today] || 0) + seconds
     );
-
-    studyTimer.textContent = formatTime(
-        getPeriodSeconds(ownStats.days, "all")
-    );
-
+    studyTimer.textContent = formatTime(getPeriodSeconds(ownStats.days, "all"));
     renderLeaderboard();
 }
 
@@ -1929,27 +1863,17 @@ async function detectionTick() {
     const now = performance.now();
 
     try {
-        const result = faceDetector.detectForVideo(
-            presenceVideo,
-            now
-        );
-
+        const result = faceDetector.detectForVideo(presenceVideo, now);
         const detected = Boolean(
             result?.detections && result.detections.length > 0
         );
-
         isPresent = detected;
 
         if (detected) {
             if (lastPresentTime > 0) {
-                const elapsed = Math.min(
-                    (now - lastPresentTime) / 1000,
-                    1.2
-                );
-
+                const elapsed = Math.min((now - lastPresentTime) / 1000, 1.2);
                 addStudySeconds(elapsed);
             }
-
             lastPresentTime = now;
             presenceText.textContent = "You are present · Time is being recorded";
         } else {
@@ -1964,7 +1888,6 @@ async function detectionTick() {
             sendMyProfile();
             lastSaveTime = Date.now();
         }
-
     } catch (error) {
         console.warn("Presence detection error:", error);
         presenceText.textContent = "Presence detection temporarily unavailable";
@@ -1977,12 +1900,9 @@ async function detectionTick() {
 async function startPresenceDetection() {
     await ensureCameraStream();
     await initializeFaceDetector();
-
     detectionLoop = true;
     lastPresentTime = 0;
-
     presenceText.textContent = "Camera is ready. Detecting your presence...";
-
     detectionTick();
 }
 
@@ -1990,14 +1910,10 @@ function stopPresenceDetection() {
     detectionLoop = false;
     isPresent = false;
     lastPresentTime = 0;
-
     studyIndicator.classList.remove("active");
 
     if (faceDetector) {
-        try {
-            faceDetector.close();
-        } catch {}
-
+        try { faceDetector.close(); } catch {}
         faceDetector = null;
     }
 
@@ -2010,16 +1926,11 @@ function stopPresenceDetection() {
 
 function updateStudyUI() {
     studyBtn.classList.toggle("active", isStudying);
-    studyBtnText.textContent = isStudying
-        ? "Stop Studying"
-        : "Start Studying";
-
+    studyBtnText.textContent = isStudying ? "Stop Studying" : "Start Studying";
     studyIndicator.classList.toggle("active", isPresent);
-
     studyStateText.textContent = isStudying
         ? "Study session active"
         : "Study session inactive";
-
     renderMembers();
 }
 
@@ -2029,29 +1940,19 @@ async function startStudy() {
 
     try {
         await startPresenceDetection();
-
         isStudying = true;
         updateStudyUI();
-
         if (socket?.connected) {
-            socket.emit("study-status", {
-                studying: true
-            });
+            socket.emit("study-status", { studying: true });
         }
-
         setStatus("Study session started. Presence detection is active.");
-
     } catch (error) {
         console.error(error);
-
         detectionLoop = false;
         isStudying = false;
-
         releaseCameraIfUnused();
-
         studyStateText.textContent = "Could not start study session";
         presenceText.textContent = error.message || "Camera or detection initialization failed.";
-
         setStatus(
             "Could not start presence detection. Check camera permission and connection.",
             true
@@ -2064,20 +1965,15 @@ async function startStudy() {
 
 function stopStudy() {
     isStudying = false;
-
     stopPresenceDetection();
-
     saveOwnStats();
     sendMyProfile();
 
     if (socket?.connected) {
-        socket.emit("study-status", {
-            studying: false
-        });
+        socket.emit("study-status", { studying: false });
     }
 
     updateStudyUI();
-
     presenceText.textContent = "Study session stopped.";
     setStatus("Your study session has ended.");
 }
@@ -2103,17 +1999,14 @@ function validateInputs() {
         errorMsg.textContent = "Please enter your name.";
         return false;
     }
-
     if (password.length < 8) {
         errorMsg.textContent = "Password must contain at least 8 characters.";
         return false;
     }
-
     if (!room) {
         errorMsg.textContent = "Please enter a room code.";
         return false;
     }
-
     if (!/^[a-zA-Z0-9_-]{1,40}$/.test(room)) {
         errorMsg.textContent = "Room code can only contain letters, numbers, _ and -.";
         return false;
@@ -2134,16 +2027,16 @@ joinBtn.addEventListener("click", joinRoom);
 async function joinRoom() {
     if (!validateInputs()) return;
 
+    // اگر peer قدیمی destroyed است، null کنید
+    if (peer && peer.destroyed) peer = null;
+
     joinBtn.disabled = true;
     joinBtn.textContent = "Connecting...";
 
     try {
         userName = nameInput.value.trim().slice(0, 30);
         roomName = roomInput.value.trim();
-
         userId = await hashPassword(passwordInput.value);
-
-        // The raw password is not stored.
         passwordInput.value = "";
 
         loadOwnStats();
@@ -2152,9 +2045,14 @@ async function joinRoom() {
         peer = new Peer(
             `conf-${roomName}-${crypto.randomUUID()}`,
             {
+                host: "conference-production-676141da.up.railway.app",
+                port: 443,
+                secure: true,
+                path: "/peerjs",
                 config: {
                     iceServers: [
                         { urls: "stun:stun.l.google.com:19302" },
+                        { urls: "stun:stun1.l.google.com:19302" },
                         {
                             urls: "turn:openrelay.metered.ca:80",
                             username: "openrelayproject",
@@ -2188,9 +2086,7 @@ async function joinRoom() {
 
             renderMembers();
             renderLeaderboard();
-
             setupSocket();
-
             setStatus("Connected. Welcome to your study room.");
         });
 
@@ -2198,15 +2094,22 @@ async function joinRoom() {
 
         peer.on("error", error => {
             console.error("PeerJS error:", error);
+
+            if (error.type === "peer-unavailable") {
+                // کاربر مقابل رفته — tile و call را پاک کنید
+                return;
+            }
+            if (error.type === "server-error" || error.type === "network") {
+                setStatus("Peer connection lost. Please refresh.", true);
+                return;
+            }
+
             setStatus("Peer connection error: " + error.type, true);
         });
 
     } catch (error) {
         console.error(error);
-
-        errorMsg.textContent =
-            error.message || "Could not initialize your account.";
-
+        errorMsg.textContent = error.message || "Could not initialize your account.";
         joinBtn.disabled = false;
         joinBtn.textContent = "Join Study Room";
     }
@@ -2221,7 +2124,6 @@ document.addEventListener("visibilitychange", () => {
         lastPresentTime = 0;
         isPresent = false;
         studyIndicator.classList.remove("active");
-
         if (isStudying) {
             presenceText.textContent = "Paused while this tab is hidden";
         }
@@ -2230,7 +2132,6 @@ document.addEventListener("visibilitychange", () => {
 
 setInterval(() => {
     if (!userId) return;
-
     saveOwnStats();
     sendMyProfile();
 }, PROFILE_SYNC_INTERVAL);
@@ -2243,22 +2144,21 @@ window.addEventListener("beforeunload", () => {
     saveOwnStats();
 
     if (isStudying && socket?.connected) {
-        socket.emit("study-status", {
-            studying: false
-        });
+        socket.emit("study-status", { studying: false });
     }
-
     if (socket) socket.disconnect();
 
     if (shareStream) {
         shareStream.getTracks().forEach(track => track.stop());
     }
-
     if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
     }
 
-    if (peer) peer.destroy();
+    if (peer && !peer.destroyed) {
+        try { peer.destroy(); } catch {}
+    }
+    peer = null;
 });
 </script>
 

@@ -1,4 +1,3 @@
-
 'use strict';
 
 const express = require('express');
@@ -19,7 +18,8 @@ const io = new Server(server, {
         origin: '*',
         methods: ['GET', 'POST']
     },
-    transports: ['polling', 'websocket'],  // ✅ هر دو را مجاز کن
+    // هر دو transport مجاز — polling اول، بعد upgrade به websocket
+    transports: ['polling', 'websocket'],
     allowUpgrades: true,
     upgradeTimeout: 10000,
     maxHttpBufferSize: 64 * 1024,
@@ -27,13 +27,15 @@ const io = new Server(server, {
     pingInterval: 25000,
     pingTimeout: 20000
 });
+
 // =====================================
 // PEERJS SERVER
 // =====================================
 
 const peerServer = ExpressPeerServer(server, {
     proxied: true,
-    debug: 2
+    debug: 2,
+    path: '/'
 });
 
 app.use('/peerjs', peerServer);
@@ -59,8 +61,6 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // ROOM STORAGE
 // =====================================
 
-// rooms[roomName] = Map<socketId, memberInfo>
-
 const rooms = new Map();
 
 const MAX_ROOM_NAME = 40;
@@ -79,17 +79,14 @@ function cleanText(value, maxLength) {
 }
 
 function isValidUserId(value) {
-    return typeof value === 'string' &&
-        /^[a-f0-9]{64}$/i.test(value);
+    return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
 }
 
 function broadcastMemberList(room) {
     const members = rooms.get(room);
-
     if (!members) return;
 
     const list = [];
-
     for (const [socketId, info] of members) {
         list.push({
             socketId,
@@ -100,17 +97,13 @@ function broadcastMemberList(room) {
             studying: info.studying
         });
     }
-
     io.to(room).emit('member-list', list);
 }
 
 function getMember(socket) {
     if (!socket.room) return null;
-
     const members = rooms.get(socket.room);
-
     if (!members) return null;
-
     return members.get(socket.id) || null;
 }
 
@@ -129,27 +122,20 @@ io.on('connection', (socket) => {
 
         const room = cleanText(payload.room, MAX_ROOM_NAME)
             .replace(/[^a-zA-Z0-9_-]/g, '');
-
         const peerId = cleanText(payload.peerId, 100);
-
         const name = cleanText(payload.name, MAX_NAME) || 'User';
-
         const userId = payload.userId;
 
         if (!room || !peerId || !isValidUserId(userId)) {
             socket.emit('join-error', {
                 message: 'Invalid room, peer ID or user ID.'
             });
-
             return;
         }
 
-        if (!rooms.has(room)) {
-            rooms.set(room, new Map());
-        }
+        if (!rooms.has(room)) rooms.set(room, new Map());
 
         const members = rooms.get(room);
-
         if (members.has(socket.id)) return;
 
         const memberInfo = {
@@ -163,18 +149,13 @@ io.on('connection', (socket) => {
         members.set(socket.id, memberInfo);
 
         socket.join(room);
-
         socket.room = room;
         socket.peerId = peerId;
         socket.userId = userId;
 
-        // Send existing members to the new user.
-
         const others = [];
-
         for (const [otherSocketId, info] of members) {
             if (otherSocketId === socket.id) continue;
-
             others.push({
                 socketId: otherSocketId,
                 peerId: info.peerId,
@@ -187,8 +168,6 @@ io.on('connection', (socket) => {
 
         socket.emit('others', others);
 
-        // Notify existing users.
-
         socket.to(room).emit('peer-joined', {
             socketId: socket.id,
             peerId,
@@ -198,17 +177,13 @@ io.on('connection', (socket) => {
             studying: false
         });
 
-        // Request existing users' study profiles.
-
         socket.to(room).emit('study-profile-request', {
             requesterUserId: userId
         });
 
         broadcastMemberList(room);
 
-        console.log(
-            `[${room}] ${name} joined. Members: ${members.size}`
-        );
+        console.log(`[${room}] ${name} joined. Members: ${members.size}`);
     });
 
     // =================================
@@ -217,7 +192,6 @@ io.on('connection', (socket) => {
 
     socket.on('cam-status', (payload = {}) => {
         const info = getMember(socket);
-
         if (!info) return;
 
         info.camOn = payload.camOn === true;
@@ -236,7 +210,6 @@ io.on('connection', (socket) => {
 
     socket.on('study-status', (payload = {}) => {
         const info = getMember(socket);
-
         if (!info) return;
 
         info.studying = payload.studying === true;
@@ -256,7 +229,6 @@ io.on('connection', (socket) => {
 
     socket.on('study-profile-request', () => {
         const info = getMember(socket);
-
         if (!info) return;
 
         socket.to(socket.room).emit('study-profile-request', {
@@ -270,36 +242,21 @@ io.on('connection', (socket) => {
 
     socket.on('study-profile', (payload = {}) => {
         const info = getMember(socket);
-
         if (!info) return;
 
         const data = payload.data;
-
-        if (
-            !data ||
-            typeof data !== 'object' ||
-            Array.isArray(data)
-        ) {
-            return;
-        }
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return;
 
         let serialized;
-
         try {
             serialized = JSON.stringify(data);
         } catch {
             return;
         }
 
-        if (
-            !serialized ||
-            Buffer.byteLength(serialized, 'utf8') > MAX_PROFILE_SIZE
-        ) {
+        if (!serialized || Buffer.byteLength(serialized, 'utf8') > MAX_PROFILE_SIZE) {
             return;
         }
-
-        // The server does not store study profiles.
-        // It only relays them to other room members.
 
         socket.to(socket.room).emit('study-profile', {
             userId: info.userId,
@@ -314,15 +271,12 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         const room = socket.room;
-
         if (!room) return;
 
         const members = rooms.get(room);
-
         if (!members) return;
 
         const info = members.get(socket.id);
-
         members.delete(socket.id);
 
         socket.to(room).emit('peer-left', {
@@ -337,9 +291,7 @@ io.on('connection', (socket) => {
             broadcastMemberList(room);
         }
 
-        console.log(
-            `[${room}] ${info?.name || socket.peerId} left.`
-        );
+        console.log(`[${room}] ${info?.name || socket.peerId} left.`);
     });
 
 });
@@ -369,7 +321,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('====================================');
     console.log('Focus Hall Server Started');
     console.log(`Port: ${PORT}`);
-    console.log('Socket.IO: Enabled');
+    console.log('Socket.IO: Enabled (polling + websocket)');
     console.log('PeerJS: Enabled');
     console.log('PeerJS Path: /peerjs');
     console.log('====================================');
