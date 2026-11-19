@@ -1,3 +1,4 @@
+
 'use strict';
 
 const express = require('express');
@@ -13,23 +14,17 @@ const server = http.createServer(app);
 // SOCKET.IO SERVER
 // =====================================
 
-
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
+        origin: '*',
+        methods: ['GET', 'POST']
     },
 
-    transports: ["polling", "websocket"],
-
+    transports: ['polling', 'websocket'],
     allowUpgrades: true,
-
     upgradeTimeout: 10000,
-
     maxHttpBufferSize: 64 * 1024,
-
     perMessageDeflate: false,
-
     pingInterval: 25000,
     pingTimeout: 20000
 });
@@ -73,6 +68,17 @@ const MAX_ROOM_NAME = 40;
 const MAX_NAME = 30;
 const MAX_PROFILE_SIZE = 20 * 1024;
 
+const ALLOWED_REACTIONS = new Set([
+    'Hi',
+    'Good morning',
+    'Bye',
+    'Good night'
+]);
+
+// Simple per-socket reaction rate limit.
+const REACTION_WINDOW_MS = 5000;
+const MAX_REACTIONS_PER_WINDOW = 4;
+
 // =====================================
 // HELPERS
 // =====================================
@@ -93,6 +99,7 @@ function broadcastMemberList(room) {
     if (!members) return;
 
     const list = [];
+
     for (const [socketId, info] of members) {
         list.push({
             socketId,
@@ -103,14 +110,38 @@ function broadcastMemberList(room) {
             studying: info.studying
         });
     }
+
     io.to(room).emit('member-list', list);
 }
 
 function getMember(socket) {
     if (!socket.room) return null;
+
     const members = rooms.get(socket.room);
     if (!members) return null;
+
     return members.get(socket.id) || null;
+}
+
+function canSendReaction(socket) {
+    const now = Date.now();
+    const state = socket.reactionRateLimit;
+
+    if (!state || now - state.windowStart >= REACTION_WINDOW_MS) {
+        socket.reactionRateLimit = {
+            windowStart: now,
+            count: 1
+        };
+
+        return true;
+    }
+
+    if (state.count >= MAX_REACTIONS_PER_WINDOW) {
+        return false;
+    }
+
+    state.count += 1;
+    return true;
 }
 
 // =====================================
@@ -128,6 +159,7 @@ io.on('connection', (socket) => {
 
         const room = cleanText(payload.room, MAX_ROOM_NAME)
             .replace(/[^a-zA-Z0-9_-]/g, '');
+
         const peerId = cleanText(payload.peerId, 100);
         const name = cleanText(payload.name, MAX_NAME) || 'User';
         const userId = payload.userId;
@@ -136,12 +168,16 @@ io.on('connection', (socket) => {
             socket.emit('join-error', {
                 message: 'Invalid room, peer ID or user ID.'
             });
+
             return;
         }
 
-        if (!rooms.has(room)) rooms.set(room, new Map());
+        if (!rooms.has(room)) {
+            rooms.set(room, new Map());
+        }
 
         const members = rooms.get(room);
+
         if (members.has(socket.id)) return;
 
         const memberInfo = {
@@ -160,8 +196,10 @@ io.on('connection', (socket) => {
         socket.userId = userId;
 
         const others = [];
+
         for (const [otherSocketId, info] of members) {
             if (otherSocketId === socket.id) continue;
+
             others.push({
                 socketId: otherSocketId,
                 peerId: info.peerId,
@@ -230,6 +268,42 @@ io.on('connection', (socket) => {
     });
 
     // =================================
+    // ROOM REACTIONS
+    // =================================
+
+    socket.on('room-reaction', (payload = {}) => {
+        const info = getMember(socket);
+
+        // Only joined room members may send reactions.
+        if (!info || !socket.room) return;
+
+        const message = cleanText(payload.message, 20);
+
+        // Accept only the four predefined messages.
+        if (!ALLOWED_REACTIONS.has(message)) return;
+
+        // Prevent reaction flooding.
+        if (!canSendReaction(socket)) {
+            socket.emit('reaction-rate-limited', {
+                message: 'Please wait before sending another reaction.'
+            });
+
+            return;
+        }
+
+        // Do not trust the sender name, userId, or room supplied by client.
+        // Use the identity and room stored by the server at join time.
+        const reaction = {
+            message,
+            name: info.name,
+            userId: info.userId
+        };
+
+        // Broadcast to every other participant in this room.
+        socket.to(socket.room).emit('room-reaction', reaction);
+    });
+
+    // =================================
     // REQUEST STUDY PROFILES
     // =================================
 
@@ -251,9 +325,11 @@ io.on('connection', (socket) => {
         if (!info) return;
 
         const data = payload.data;
+
         if (!data || typeof data !== 'object' || Array.isArray(data)) return;
 
         let serialized;
+
         try {
             serialized = JSON.stringify(data);
         } catch {
@@ -330,5 +406,6 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log('Socket.IO: Enabled (polling + websocket)');
     console.log('PeerJS: Enabled');
     console.log('PeerJS Path: /peerjs');
+    console.log('Room Reactions: Enabled');
     console.log('====================================');
 });
