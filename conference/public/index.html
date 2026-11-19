@@ -1,799 +1,2486 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#080911">
-<title>Focus Hall — Study Together</title>
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="/socket.io/socket.io.js"></script>
-
-<style>
-:root {
-    --bg: #080911;
-    --surface: rgba(24,25,42,.72);
-    --surface2: rgba(255,255,255,.045);
-    --border: rgba(255,255,255,.09);
-    --text: #f5f5f7;
-    --muted: #9293a5;
-    --accent: #7775f5;
-    --purple: #a78bfa;
-    --green: #10b981;
-    --red: #f43f5e;
-    --gold: #fbbf24;
-    --radius: 18px;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-    min-height: 100vh;
-    padding: 24px;
-    color: var(--text);
-    background:
-        radial-gradient(ellipse at 10% 5%, rgba(99,102,241,.18), transparent 35%),
-        radial-gradient(ellipse at 90% 85%, rgba(139,92,246,.13), transparent 35%),
-        var(--bg);
-    font-family: Inter, sans-serif;
-    -webkit-font-smoothing: antialiased;
-}
-
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background-image:
-        linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px);
-    background-size: 42px 42px;
-    mask-image: linear-gradient(to bottom, black, transparent);
-}
-
-button, input { font: inherit; }
-button { color: inherit; }
-
-.glass {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    box-shadow: 0 25px 80px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);
-}
-
-/* JOIN */
-#joinScreen {
-    min-height: calc(100vh - 48px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.join-card {
-    width: 100%;
-    max-width: 440px;
-    padding: 42px;
-    border-radius: 26px;
-    position: relative;
-    overflow: hidden;
-    animation: enter .6s ease both;
-}
-
-.join-card::before {
-    content: "";
-    position: absolute;
-    width: 240px;
-    height: 240px;
-    top: -150px;
-    right: -100px;
-    background: var(--accent);
-    filter: blur(95px);
-    opacity: .35;
-    pointer-events: none;
-}
-
-.logo {
-    width: 58px;
-    height: 58px;
-    display: grid;
-    place-items: center;
-    border-radius: 17px;
-    background: linear-gradient(135deg, #6366f1, #a78bfa);
-    box-shadow: 0 10px 35px rgba(99,102,241,.3);
-    margin-bottom: 25px;
-}
-
-.logo svg { width: 28px; height: 28px; }
-
-.join-card h1 { font-size: 29px; letter-spacing: -1px; margin-bottom: 9px; }
-
-.join-card > p {
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 1.7;
-    margin-bottom: 30px;
-}
-
-.field { margin-bottom: 17px; }
-
-.field label {
-    display: block;
-    margin-bottom: 9px;
-    color: #b9bac8;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: .7px;
-    text-transform: uppercase;
-}
-
-.field input {
-    width: 100%;
-    padding: 15px 16px;
-    color: white;
-    outline: none;
-    background: rgba(255,255,255,.045);
-    border: 1px solid var(--border);
-    border-radius: 13px;
-    transition: .2s ease;
-}
-
-.field input::placeholder { color: #626477; }
-
-.field input:focus {
-    border-color: #818cf8;
-    background: rgba(99,102,241,.07);
-    box-shadow: 0 0 0 4px rgba(99,102,241,.12);
-}
-
-.field-hint {
-    display: block;
-    margin-top: 8px;
-    color: var(--muted);
-    font-size: 11px;
-    line-height: 1.6;
-}
-
-.btn-primary {
-    width: 100%;
-    padding: 15px;
-    margin-top: 8px;
-    border: 1px solid rgba(255,255,255,.13);
-    border-radius: 13px;
-    color: white;
-    background: linear-gradient(115deg, #6366f1, #8b5cf6);
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: 0 8px 25px rgba(99,102,241,.2);
-    transition: .25s ease;
-}
-
-.btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 35px rgba(99,102,241,.35);
-}
-
-.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-
-.error {
-    min-height: 20px;
-    margin-top: 14px;
-    color: var(--red);
-    text-align: center;
-    font-size: 12px;
-}
-
-/* ROOM */
-#roomScreen { display: none; max-width: 1500px; margin: 0 auto; }
-#roomScreen.active { display: block; }
-
-.topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 15px;
-    flex-wrap: wrap;
-    padding: 15px 19px;
-    margin-bottom: 22px;
-    border-radius: 18px;
-}
-
-.topbar-left { display: flex; align-items: center; gap: 13px; }
-
-.brand-icon {
-    width: 42px;
-    height: 42px;
-    display: grid;
-    place-items: center;
-    border-radius: 13px;
-    background: linear-gradient(135deg, #6366f1, #a78bfa);
-}
-
-.brand-icon svg { width: 22px; height: 22px; }
-
-.topbar h2 { font-size: 16px; font-weight: 750; }
-.topbar h2 span { color: var(--muted); font-weight: 500; }
-
-.user-chip {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 7px 13px 7px 8px;
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    background: rgba(255,255,255,.04);
-    font-size: 13px;
-    font-weight: 650;
-}
-
-.avatar {
-    width: 28px;
-    height: 28px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #6366f1, #a78bfa);
-    font-size: 12px;
-    font-weight: 800;
-}
-
-.layout {
-    display: grid;
-    grid-template-columns: minmax(0,1fr) 270px;
-    gap: 18px;
-}
-
-@media(max-width: 950px) {
-    .layout { grid-template-columns: 1fr; }
-    .members-panel { order: -1; position: static !important; }
-}
-
-/* VIDEO */
-#videoGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%,290px),1fr));
-    gap: 15px;
-    align-content: start;
-}
-
-.video-tile {
-    position: relative;
-    overflow: hidden;
-    aspect-ratio: 16 / 9;
-    min-height: 170px;
-    border-radius: 19px;
-    background: #11121e;
-    border: 1px solid var(--border);
-    transition: .25s ease;
-}
-
-.video-tile:hover {
-    transform: translateY(-2px);
-    border-color: rgba(129,140,248,.4);
-    box-shadow: 0 15px 40px rgba(0,0,0,.25);
-}
-
-.video-tile video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background: #080911;
-    image-rendering: pixelated;
-}
-
-.video-tile canvas.enhanced-video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    background: #000;
-    display: none;
-    image-rendering: pixelated;
-}
-
-.video-tile.enhanced canvas.enhanced-video { display: block; }
-.video-tile.enhanced video { opacity: 0; }
-
-.video-tile.mirror video,
-.video-tile.mirror canvas.enhanced-video { transform: scaleX(-1); }
-
-.placeholder {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 13px;
-    background:
-        radial-gradient(circle at center, rgba(99,102,241,.1), transparent 65%),
-        #11121e;
-}
-
-.avatar-lg {
-    width: 75px;
-    height: 75px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #27283e, #171827);
-    border: 1px solid rgba(255,255,255,.12);
-    color: #c4c5d5;
-    font-size: 30px;
-    font-weight: 750;
-}
-
-.placeholder .txt { color: var(--muted); font-size: 12px; }
-.video-tile.has-video .placeholder { display: none; }
-
-.name-tag {
-    position: absolute;
-    z-index: 2;
-    bottom: 11px;
-    left: 11px;
-    max-width: calc(100% - 22px);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 11px;
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 9px;
-    background: rgba(8,9,17,.76);
-    backdrop-filter: blur(14px);
-    font-size: 12px;
-    font-weight: 650;
-}
-
-.name-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.dot {
-    width: 7px;
-    height: 7px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--red);
-}
-
-.dot.on {
-    background: var(--green);
-    box-shadow: 0 0 9px var(--green);
-}
-
-.you-tag {
-    position: absolute;
-    z-index: 2;
-    top: 11px;
-    right: 11px;
-    padding: 5px 9px;
-    border-radius: 7px;
-    background: #6366f1;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: .5px;
-}
-
-/* MEMBERS */
-.members-panel {
-    height: fit-content;
-    position: sticky;
-    top: 20px;
-    padding: 19px;
-    border-radius: 19px;
-}
-
-.panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-}
-
-.panel-header h3 {
-    color: #b5b6c7;
-    font-size: 12px;
-    letter-spacing: .7px;
-    text-transform: uppercase;
-}
-
-.count-badge {
-    padding: 3px 10px;
-    border-radius: 30px;
-    background: rgba(99,102,241,.25);
-    color: #c7c6ff;
-    font-size: 11px;
-    font-weight: 800;
-}
-
-.member-list { display: flex; flex-direction: column; gap: 7px; }
-
-.member-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px;
-    border: 1px solid transparent;
-    border-radius: 12px;
-    background: rgba(255,255,255,.035);
-    transition: .2s ease;
-}
-
-.member-item:hover {
-    background: rgba(255,255,255,.07);
-    border-color: var(--border);
-}
-
-.member-avatar {
-    width: 34px;
-    height: 34px;
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    background: linear-gradient(135deg, #25263b, #171827);
-    color: #c8c9d8;
-    font-size: 13px;
-    font-weight: 750;
-}
-
-.member-item.me .member-avatar {
-    background: linear-gradient(135deg, #6366f1, #a78bfa);
-    color: white;
-}
-
-.member-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.you-label { color: #a5a4ff; font-size: 10px; }
-
-.member-status {
-    width: 8px;
-    height: 8px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: #55566a;
-}
-
-.member-status.cam-on {
-    background: var(--green);
-    box-shadow: 0 0 7px var(--green);
-}
-
-.member-study { color: #a5b4fc; font-size: 10px; }
-
-/* CONTROLS */
-.controls {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 22px;
-}
-
-.control-button {
-    min-width: 185px;
-    min-height: 51px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 13px 20px;
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 14px;
-    color: white;
-    font-size: 13px;
-    font-weight: 750;
-    cursor: pointer;
-    transition: .22s ease;
-}
-
-.control-button svg { width: 19px; height: 19px; flex-shrink: 0; }
-
-.control-button:hover:not(:disabled) {
-    transform: translateY(-3px);
-    filter: brightness(1.12);
-}
-
-.control-button:active { transform: scale(.97); }
-.control-button:disabled { opacity: .5; cursor: not-allowed; }
-
-.study-button {
-    background: linear-gradient(120deg, #059669, #10b981);
-    box-shadow: 0 8px 24px rgba(16,185,129,.16);
-}
-
-.study-button.active { background: linear-gradient(120deg, #b45309, #f59e0b); }
-
-.camera-button {
-    background: linear-gradient(120deg, #4f46e5, #6366f1);
-    box-shadow: 0 8px 24px rgba(99,102,241,.18);
-}
-
-.camera-button.active { background: linear-gradient(120deg, #be123c, #f43f5e); }
-
-/* STUDY PANEL */
-.study-panel, .leaderboard-panel {
-    margin-top: 19px;
-    padding: 20px;
-    border-radius: 19px;
-}
-
-.study-panel {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 15px;
-}
-
-.study-info { display: flex; align-items: center; gap: 13px; }
-
-.study-indicator {
-    width: 11px;
-    height: 11px;
-    border-radius: 50%;
-    background: #64748b;
-    box-shadow: 0 0 0 5px rgba(100,116,139,.1);
-    transition: .2s ease;
-}
-
-.study-indicator.active {
-    background: var(--green);
-    box-shadow: 0 0 0 5px rgba(16,185,129,.12), 0 0 18px rgba(16,185,129,.6);
-    animation: pulse 1.8s infinite;
-}
-
-#studyStateText { font-size: 13px; font-weight: 750; }
-.study-subtitle { margin-top: 5px; color: var(--muted); font-size: 11px; }
-
-.study-timer {
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    font-variant-numeric: tabular-nums;
-}
-
-/* LEADERBOARD */
-.leaderboard-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 13px;
-    margin-bottom: 18px;
-}
-
-.leaderboard-title { font-size: 14px; font-weight: 800; }
-
-.period-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
-
-.period-tab {
-    padding: 8px 11px;
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    background: rgba(255,255,255,.035);
-    color: var(--muted);
-    font-size: 11px;
-    cursor: pointer;
-    transition: .2s ease;
-}
-
-.period-tab:hover, .period-tab.active {
-    color: white;
-    border-color: rgba(129,140,248,.4);
-    background: rgba(99,102,241,.2);
-}
-
-.leaderboard-list { display: flex; flex-direction: column; gap: 8px; }
-
-.leaderboard-item {
-    display: grid;
-    grid-template-columns: 36px minmax(0,1fr) auto;
-    align-items: center;
-    gap: 11px;
-    padding: 11px;
-    border: 1px solid rgba(255,255,255,.055);
-    border-radius: 12px;
-    background: rgba(255,255,255,.035);
-    animation: enter .3s ease both;
-}
-
-.leaderboard-rank {
-    width: 33px;
-    height: 33px;
-    display: grid;
-    place-items: center;
-    border-radius: 10px;
-    background: rgba(255,255,255,.06);
-    color: #c5c6d5;
-    font-size: 12px;
-    font-weight: 850;
-}
-
-.leaderboard-item:first-child .leaderboard-rank {
-    color: #161616;
-    background: linear-gradient(135deg, #fde68a, #f59e0b);
-}
-
-.leaderboard-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.leaderboard-time {
-    color: #b2b0ff;
-    font-size: 12px;
-    font-weight: 800;
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-}
-
-.empty-leaderboard {
-    padding: 25px 10px;
-    color: var(--muted);
-    text-align: center;
-    font-size: 12px;
-}
-
-#statusMsg {
-    min-height: 20px;
-    margin-top: 15px;
-    color: var(--muted);
-    text-align: center;
-    font-size: 12px;
-}
-
-#statusMsg.error-text { color: var(--red); }
-
-@keyframes pulse { 50% { opacity: .55; } }
-
-@keyframes enter {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-@media(max-width: 600px) {
-    body { padding: 12px; }
-    #joinScreen { min-height: calc(100vh - 24px); }
-    .join-card { padding: 30px 22px; }
-    .topbar { padding: 12px; }
-    .control-button { flex: 1 1 145px; min-width: 0; }
-    .study-panel, .leaderboard-panel { padding: 15px; }
-    .study-timer { font-size: 22px; }
-}
-
-@media(prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-        animation-duration: .01ms !important;
-        transition-duration: .01ms !important;
-    }
-}
-</style>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <meta content="#080911" name="theme-color" />
+    <title>Focus Hall — Study Together</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root {
+            --bg: #080911;
+            --surface: rgba(24, 25, 42, .72);
+            --surface2: rgba(255, 255, 255, .045);
+            --border: rgba(255, 255, 255, .09);
+            --text: #f5f5f7;
+            --muted: #9293a5;
+            --accent: #7775f5;
+            --purple: #a78bfa;
+            --green: #10b981;
+            --red: #f43f5e;
+            --gold: #fbbf24;
+            --radius: 18px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            padding: 24px;
+            color: var(--text);
+            background:
+                radial-gradient(ellipse at 10% 5%, rgba(99, 102, 241, .18), transparent 35%),
+                radial-gradient(ellipse at 90% 85%, rgba(139, 92, 246, .13), transparent 35%),
+                var(--bg);
+            font-family: Inter, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, .012) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, .012) 1px, transparent 1px);
+            background-size: 42px 42px;
+            mask-image: linear-gradient(to bottom, black, transparent);
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            color: inherit;
+        }
+
+        .glass {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 25px 80px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .04);
+        }
+
+        /* JOIN */
+        #joinScreen {
+            min-height: calc(100vh - 48px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .join-card {
+            width: 100%;
+            max-width: 440px;
+            padding: 42px;
+            border-radius: 26px;
+            position: relative;
+            overflow: hidden;
+            animation: enter .6s ease both;
+        }
+
+        .join-card::before {
+            content: "";
+            position: absolute;
+            width: 240px;
+            height: 240px;
+            top: -150px;
+            right: -100px;
+            background: var(--accent);
+            filter: blur(95px);
+            opacity: .35;
+            pointer-events: none;
+        }
+
+        .logo {
+            width: 58px;
+            height: 58px;
+            display: grid;
+            place-items: center;
+            border-radius: 17px;
+            background: linear-gradient(135deg, #6366f1, #a78bfa);
+            box-shadow: 0 10px 35px rgba(99, 102, 241, .3);
+            margin-bottom: 25px;
+        }
+
+        .logo svg {
+            width: 28px;
+            height: 28px;
+        }
+
+        .join-card h1 {
+            font-size: 29px;
+            letter-spacing: -1px;
+            margin-bottom: 9px;
+        }
+
+        .join-card>p {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.7;
+            margin-bottom: 30px;
+        }
+
+        .field {
+            margin-bottom: 17px;
+        }
+
+        .field label {
+            display: block;
+            margin-bottom: 9px;
+            color: #b9bac8;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .7px;
+            text-transform: uppercase;
+        }
+
+        .field input {
+            width: 100%;
+            padding: 15px 16px;
+            color: white;
+            outline: none;
+            background: rgba(255, 255, 255, .045);
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            transition: .2s ease;
+        }
+
+        .field input::placeholder {
+            color: #626477;
+        }
+
+        .field input:focus {
+            border-color: #818cf8;
+            background: rgba(99, 102, 241, .07);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, .12);
+        }
+
+        .field-hint {
+            display: block;
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.6;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 15px;
+            margin-top: 8px;
+            border: 1px solid rgba(255, 255, 255, .13);
+            border-radius: 13px;
+            color: white;
+            background: linear-gradient(115deg, #6366f1, #8b5cf6);
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 8px 25px rgba(99, 102, 241, .2);
+            transition: .25s ease;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(99, 102, 241, .35);
+        }
+
+        .btn-primary:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .error {
+            min-height: 20px;
+            margin-top: 14px;
+            color: var(--red);
+            text-align: center;
+            font-size: 12px;
+        }
+
+        /* ROOM */
+        #roomScreen {
+            display: none;
+            max-width: 1500px;
+            margin: 0 auto;
+        }
+
+        #roomScreen.active {
+            display: block;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            flex-wrap: wrap;
+            padding: 15px 19px;
+            margin-bottom: 22px;
+            border-radius: 18px;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+        }
+
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+            display: grid;
+            place-items: center;
+            border-radius: 13px;
+            background: linear-gradient(135deg, #6366f1, #a78bfa);
+        }
+
+        .brand-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .topbar h2 {
+            font-size: 16px;
+            font-weight: 750;
+        }
+
+        .topbar h2 span {
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .user-chip {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 7px 13px 7px 8px;
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            background: rgba(255, 255, 255, .04);
+            font-size: 13px;
+            font-weight: 650;
+        }
+
+        .avatar {
+            width: 28px;
+            height: 28px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1, #a78bfa);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 270px;
+            gap: 18px;
+        }
+
+        @media(max-width: 950px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .members-panel {
+                order: -1;
+                position: static !important;
+            }
+        }
+
+        /* VIDEO */
+        #videoGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+            gap: 15px;
+            align-content: start;
+        }
+
+        .video-tile {
+            position: relative;
+            overflow: hidden;
+            aspect-ratio: 16 / 9;
+            min-height: 170px;
+            border-radius: 19px;
+            background: #11121e;
+            border: 1px solid var(--border);
+            transition: .25s ease;
+        }
+
+        .video-tile:hover {
+            transform: translateY(-2px);
+            border-color: rgba(129, 140, 248, .4);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, .25);
+        }
+
+        .video-tile video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #080911;
+            image-rendering: pixelated;
+        }
+
+        .video-tile canvas.enhanced-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #000;
+            display: none;
+            image-rendering: pixelated;
+        }
+
+        .video-tile.enhanced canvas.enhanced-video {
+            display: block;
+        }
+
+        .video-tile.enhanced video {
+            opacity: 0;
+        }
+
+        .video-tile.mirror video,
+        .video-tile.mirror canvas.enhanced-video {
+            transform: scaleX(-1);
+        }
+
+        .placeholder {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 13px;
+            background:
+                radial-gradient(circle at center, rgba(99, 102, 241, .1), transparent 65%),
+                #11121e;
+        }
+
+        .avatar-lg {
+            width: 75px;
+            height: 75px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #27283e, #171827);
+            border: 1px solid rgba(255, 255, 255, .12);
+            color: #c4c5d5;
+            font-size: 30px;
+            font-weight: 750;
+        }
+
+        .placeholder .txt {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .video-tile.has-video .placeholder {
+            display: none;
+        }
+
+        .name-tag {
+            position: absolute;
+            z-index: 2;
+            bottom: 11px;
+            left: 11px;
+            max-width: calc(100% - 22px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 11px;
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 9px;
+            background: rgba(8, 9, 17, .76);
+            backdrop-filter: blur(14px);
+            font-size: 12px;
+            font-weight: 650;
+        }
+
+        .name-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .dot {
+            width: 7px;
+            height: 7px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: var(--red);
+        }
+
+        .dot.on {
+            background: var(--green);
+            box-shadow: 0 0 9px var(--green);
+        }
+
+        .you-tag {
+            position: absolute;
+            z-index: 2;
+            top: 11px;
+            right: 11px;
+            padding: 5px 9px;
+            border-radius: 7px;
+            background: #6366f1;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .5px;
+        }
+
+
+        /* SCREEN SHARING */
+        .screen-share-section {
+            display: none;
+            margin-bottom: 16px;
+        }
+
+        .screen-share-section.active {
+            display: block;
+            animation: enter .35s ease both;
+        }
+
+        .screen-share-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 0 2px 10px;
+            color: #c9c9dc;
+            font-size: 12px;
+            font-weight: 750;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .screen-share-heading span {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .screen-share-heading i {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #34d399;
+            box-shadow: 0 0 12px #34d399;
+        }
+
+        .screen-share-tile {
+            aspect-ratio: 16/9;
+            min-height: 220px;
+            background: #07080e;
+            border-color: rgba(129, 140, 248, .28);
+        }
+
+        .screen-share-tile video {
+            object-fit: contain;
+            background: #07080e;
+        }
+
+        .screen-share-tile .placeholder {
+            background: radial-gradient(circle at center, rgba(99, 102, 241, .08), transparent 65%), #090a12;
+        }
+
+        .screen-share-tile .avatar-lg {
+            display: none;
+        }
+
+        .screen-share-tile .placeholder .txt {
+            font-size: 13px;
+        }
+
+        .screen-tag {
+            position: absolute;
+            z-index: 3;
+            top: 12px;
+            left: 12px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 10px;
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 9px;
+            color: #f5f5ff;
+            background: rgba(8, 9, 17, .78);
+            backdrop-filter: blur(12px);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .06em;
+        }
+
+        .screen-tag::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #34d399;
+            box-shadow: 0 0 9px #34d399;
+        }
+
+        .screen-button {
+            background: linear-gradient(120deg, #4338ca, #6366f1);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, .18);
+        }
+
+        .screen-button.active {
+            background: linear-gradient(120deg, #be123c, #f43f5e);
+        }
+
+        .control-button:focus-visible,
+        .btn-primary:focus-visible {
+            outline: 3px solid rgba(165, 180, 252, .8);
+            outline-offset: 3px;
+        }
+
+        @media(max-width:600px) {
+            .screen-share-tile {
+                min-height: 180px;
+            }
+
+            .controls {
+                gap: 9px;
+            }
+        }
+
+        /* MEMBERS */
+        .members-panel {
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+            padding: 19px;
+            border-radius: 19px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .panel-header h3 {
+            color: #b5b6c7;
+            font-size: 12px;
+            letter-spacing: .7px;
+            text-transform: uppercase;
+        }
+
+        .count-badge {
+            padding: 3px 10px;
+            border-radius: 30px;
+            background: rgba(99, 102, 241, .25);
+            color: #c7c6ff;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .member-list {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px;
+            border: 1px solid transparent;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .035);
+            transition: .2s ease;
+        }
+
+        .member-item:hover {
+            background: rgba(255, 255, 255, .07);
+            border-color: var(--border);
+        }
+
+        .member-avatar {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            background: linear-gradient(135deg, #25263b, #171827);
+            color: #c8c9d8;
+            font-size: 13px;
+            font-weight: 750;
+        }
+
+        .member-item.me .member-avatar {
+            background: linear-gradient(135deg, #6366f1, #a78bfa);
+            color: white;
+        }
+
+        .member-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .you-label {
+            color: #a5a4ff;
+            font-size: 10px;
+        }
+
+        .member-status {
+            width: 8px;
+            height: 8px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: #55566a;
+        }
+
+        .member-status.cam-on {
+            background: var(--green);
+            box-shadow: 0 0 7px var(--green);
+        }
+
+        .member-study {
+            color: #a5b4fc;
+            font-size: 10px;
+        }
+
+        /* CONTROLS */
+        .controls {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 22px;
+        }
+
+        .control-button {
+            min-width: 185px;
+            min-height: 51px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 13px 20px;
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 14px;
+            color: white;
+            font-size: 13px;
+            font-weight: 750;
+            cursor: pointer;
+            transition: .22s ease;
+        }
+
+        .control-button svg {
+            width: 19px;
+            height: 19px;
+            flex-shrink: 0;
+        }
+
+        .control-button:hover:not(:disabled) {
+            transform: translateY(-3px);
+            filter: brightness(1.12);
+        }
+
+        .control-button:active {
+            transform: scale(.97);
+        }
+
+        .control-button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .study-button {
+            background: linear-gradient(120deg, #059669, #10b981);
+            box-shadow: 0 8px 24px rgba(16, 185, 129, .16);
+        }
+
+        .study-button.active {
+            background: linear-gradient(120deg, #b45309, #f59e0b);
+        }
+
+        .camera-button {
+            background: linear-gradient(120deg, #4f46e5, #6366f1);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, .18);
+        }
+
+        .camera-button.active {
+            background: linear-gradient(120deg, #be123c, #f43f5e);
+        }
+
+        /* STUDY PANEL */
+        .study-panel,
+        .leaderboard-panel {
+            margin-top: 19px;
+            padding: 20px;
+            border-radius: 19px;
+        }
+
+        .study-panel {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .study-info {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+        }
+
+        .study-indicator {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            background: #64748b;
+            box-shadow: 0 0 0 5px rgba(100, 116, 139, .1);
+            transition: .2s ease;
+        }
+
+        .study-indicator.active {
+            background: var(--green);
+            box-shadow: 0 0 0 5px rgba(16, 185, 129, .12), 0 0 18px rgba(16, 185, 129, .6);
+            animation: pulse 1.8s infinite;
+        }
+
+        #studyStateText {
+            font-size: 13px;
+            font-weight: 750;
+        }
+
+        .study-subtitle {
+            margin-top: 5px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .study-timer {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* LEADERBOARD */
+        .leaderboard-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 13px;
+            margin-bottom: 18px;
+        }
+
+        .leaderboard-title {
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .period-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .period-tab {
+            padding: 8px 11px;
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            background: rgba(255, 255, 255, .035);
+            color: var(--muted);
+            font-size: 11px;
+            cursor: pointer;
+            transition: .2s ease;
+        }
+
+        .period-tab:hover,
+        .period-tab.active {
+            color: white;
+            border-color: rgba(129, 140, 248, .4);
+            background: rgba(99, 102, 241, .2);
+        }
+
+        .leaderboard-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .leaderboard-item {
+            display: grid;
+            grid-template-columns: 36px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 11px;
+            padding: 11px;
+            border: 1px solid rgba(255, 255, 255, .055);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .035);
+            animation: enter .3s ease both;
+        }
+
+        .leaderboard-rank {
+            width: 33px;
+            height: 33px;
+            display: grid;
+            place-items: center;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, .06);
+            color: #c5c6d5;
+            font-size: 12px;
+            font-weight: 850;
+        }
+
+        .leaderboard-item:first-child .leaderboard-rank {
+            color: #161616;
+            background: linear-gradient(135deg, #fde68a, #f59e0b);
+        }
+
+        .leaderboard-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .leaderboard-time {
+            color: #b2b0ff;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .empty-leaderboard {
+            padding: 25px 10px;
+            color: var(--muted);
+            text-align: center;
+            font-size: 12px;
+        }
+
+        #statusMsg {
+            min-height: 20px;
+            margin-top: 15px;
+            color: var(--muted);
+            text-align: center;
+            font-size: 12px;
+        }
+
+        #statusMsg.error-text {
+            color: var(--red);
+        }
+
+        @keyframes pulse {
+            50% {
+                opacity: .55;
+            }
+        }
+
+        @keyframes enter {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media(max-width: 600px) {
+            body {
+                padding: 12px;
+            }
+
+            #joinScreen {
+                min-height: calc(100vh - 24px);
+            }
+
+            .join-card {
+                padding: 30px 22px;
+            }
+
+            .topbar {
+                padding: 12px;
+            }
+
+            .control-button {
+                flex: 1 1 145px;
+                min-width: 0;
+            }
+
+            .study-panel,
+            .leaderboard-panel {
+                padding: 15px;
+            }
+
+            .study-timer {
+                font-size: 22px;
+            }
+        }
+
+        @media(prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: .01ms !important;
+                transition-duration: .01ms !important;
+            }
+        }
+
+        /* =========================================
+   FOCUS HALL — TABBED APP SHELL
+========================================= */
+        body {
+            padding-bottom: 116px;
+        }
+
+        #roomScreen {
+            max-width: 1320px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+            animation: tabReveal .38s cubic-bezier(.2, .75, .25, 1) both;
+        }
+
+        #cameraTabPanel {
+            padding-bottom: 18px;
+        }
+
+        .ranking-view {
+            max-width: 1080px;
+            margin: 12px auto 40px;
+        }
+
+        .ranking-view .leaderboard-panel {
+            margin-top: 0;
+            padding: clamp(20px, 4vw, 38px);
+        }
+
+        .bottom-taskbar {
+            position: fixed;
+            z-index: 1000;
+            left: 50%;
+            bottom: max(18px, env(safe-area-inset-bottom));
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px;
+            border: 1px solid rgba(255, 255, 255, .13);
+            border-radius: 22px;
+            background: rgba(17, 18, 31, .88);
+            box-shadow: 0 18px 65px rgba(0, 0, 0, .48), inset 0 1px 0 rgba(255, 255, 255, .08);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+
+        .taskbar-item {
+            min-width: 142px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 11px 17px;
+            border: 1px solid transparent;
+            border-radius: 15px;
+            color: #9293a8;
+            background: transparent;
+            font-size: 12px;
+            font-weight: 750;
+            cursor: pointer;
+            transition: .25s ease;
+        }
+
+        .taskbar-icon {
+            width: 20px;
+            height: 20px;
+            display: grid;
+            place-items: center;
+        }
+
+        .taskbar-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .taskbar-item:hover {
+            color: white;
+            background: rgba(255, 255, 255, .06);
+        }
+
+        .taskbar-item.active {
+            color: white;
+            border-color: rgba(165, 155, 255, .24);
+            background: linear-gradient(135deg, rgba(99, 102, 241, .30), rgba(139, 92, 246, .20));
+            box-shadow: 0 5px 22px rgba(99, 102, 241, .15), inset 0 1px 0 rgba(255, 255, 255, .08);
+        }
+
+        .taskbar-item.active .taskbar-icon {
+            color: #b8b4ff;
+        }
+
+        #videoGrid {
+            grid-template-columns: repeat(auto-fit, minmax(190px, 240px));
+            justify-content: center;
+            gap: 17px;
+            min-height: 0;
+            padding: 8px 0;
+        }
+
+        .video-tile {
+            width: 100%;
+            min-height: 0;
+            aspect-ratio: 16 / 10;
+            border-radius: 17px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, .2);
+        }
+
+        .video-tile video {
+            object-fit: cover;
+        }
+
+        .video-tile .avatar-lg {
+            width: 58px;
+            height: 58px;
+            font-size: 23px;
+        }
+
+        .video-tile .placeholder {
+            gap: 9px;
+        }
+
+        #screenShareGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+            gap: 14px;
+        }
+
+        .screen-share-tile {
+            min-height: 230px;
+            aspect-ratio: 16 / 9;
+        }
+
+        .ranking-view .leaderboard-header {
+            align-items: flex-start;
+            margin-bottom: 24px;
+        }
+
+        .ranking-view .leaderboard-title {
+            font-size: clamp(20px, 3vw, 27px);
+            letter-spacing: -.7px;
+        }
+
+        .ranking-view .leaderboard-title::before {
+            content: "HALL OF FAME";
+            display: block;
+            margin-bottom: 9px;
+            color: #a5a1ff;
+            font-size: 10px;
+            letter-spacing: 2.8px;
+        }
+
+        .podium {
+            min-height: 290px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: clamp(8px, 2.5vw, 26px);
+            padding: 26px 12px 0;
+            margin: 8px 0 26px;
+            border-radius: 22px;
+            background:
+                radial-gradient(ellipse at 50% 100%, rgba(99, 102, 241, .19), transparent 60%),
+                linear-gradient(180deg, rgba(255, 255, 255, .018), rgba(255, 255, 255, .035));
+            border: 1px solid rgba(255, 255, 255, .055);
+        }
+
+        .podium-card {
+            position: relative;
+            width: min(28%, 210px);
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            animation: podiumRise .65s cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        .podium-card.podium-1 {
+            order: 2;
+        }
+
+        .podium-card.podium-2 {
+            order: 1;
+        }
+
+        .podium-card.podium-3 {
+            order: 3;
+        }
+
+        .podium-crown {
+            height: 23px;
+            margin-bottom: 5px;
+            color: #fbbf24;
+            font-size: 23px;
+            line-height: 1;
+            filter: drop-shadow(0 0 12px rgba(251, 191, 36, .38));
+        }
+
+        .podium-2 .podium-crown {
+            color: #cbd5e1;
+        }
+
+        .podium-3 .podium-crown {
+            color: #d69b72;
+        }
+
+        .podium-avatar {
+            width: 66px;
+            height: 66px;
+            display: grid;
+            place-items: center;
+            border: 3px solid rgba(255, 255, 255, .17);
+            border-radius: 50%;
+            color: white;
+            background: linear-gradient(145deg, #5554bd, #252444);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, .28);
+            font-size: 23px;
+            font-weight: 850;
+        }
+
+        .podium-1 .podium-avatar {
+            width: 84px;
+            height: 84px;
+            border-color: #f6cf69;
+            background: linear-gradient(145deg, #a77a28, #55401e);
+            box-shadow: 0 0 0 6px rgba(251, 191, 36, .08), 0 0 35px rgba(251, 191, 36, .18);
+        }
+
+        .podium-2 .podium-avatar {
+            border-color: #aeb9c9;
+        }
+
+        .podium-3 .podium-avatar {
+            border-color: #bd8a68;
+        }
+
+        .podium-name {
+            max-width: 100%;
+            margin-top: 10px;
+            overflow: hidden;
+            color: #f4f4fb;
+            font-size: 13px;
+            font-weight: 800;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .podium-time {
+            margin-top: 5px;
+            color: #c2bfff;
+            font-size: 12px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .podium-rank {
+            margin-top: 5px;
+            color: #9293a8;
+            font-size: 9px;
+            font-weight: 850;
+            letter-spacing: 1.2px;
+        }
+
+        .podium-stand {
+            width: 100%;
+            height: 75px;
+            display: grid;
+            place-items: start center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-bottom: 0;
+            border-radius: 13px 13px 0 0;
+            color: rgba(255, 255, 255, .88);
+            background: linear-gradient(180deg, rgba(148, 163, 184, .22), rgba(71, 85, 105, .10));
+            font-size: 22px;
+            font-weight: 900;
+        }
+
+        .podium-1 .podium-stand {
+            height: 112px;
+            border-color: rgba(251, 191, 36, .35);
+            color: #ffdf87;
+            background: linear-gradient(180deg, rgba(217, 165, 56, .30), rgba(120, 83, 25, .12));
+            box-shadow: inset 0 1px 0 rgba(255, 225, 145, .18), 0 -8px 35px rgba(251, 191, 36, .05);
+        }
+
+        .podium-2 .podium-stand {
+            height: 88px;
+            border-color: rgba(203, 213, 225, .22);
+        }
+
+        .podium-3 .podium-stand {
+            height: 64px;
+            border-color: rgba(205, 139, 94, .25);
+            background: linear-gradient(180deg, rgba(180, 110, 68, .2), rgba(100, 60, 40, .1));
+        }
+
+        .ranking-view .leaderboard-list {
+            gap: 10px;
+        }
+
+        .ranking-view .leaderboard-item {
+            grid-template-columns: 42px minmax(0, 1fr) auto;
+            padding: 14px 16px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, .045);
+            transition: .2s ease;
+        }
+
+        .ranking-view .leaderboard-item:hover {
+            transform: translateX(-3px);
+            border-color: rgba(129, 140, 248, .25);
+            background: rgba(99, 102, 241, .08);
+        }
+
+        .ranking-view .leaderboard-rank {
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+        }
+
+        @keyframes tabReveal {
+            from {
+                opacity: 0;
+                transform: translateY(9px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes podiumRise {
+            from {
+                opacity: 0;
+                transform: translateY(24px) scale(.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 12px 12px 105px;
+            }
+
+            .bottom-taskbar {
+                bottom: max(10px, env(safe-area-inset-bottom));
+                width: min(94vw, 390px);
+                justify-content: stretch;
+            }
+
+            .taskbar-item {
+                min-width: 0;
+                flex: 1;
+                padding: 10px 9px;
+                gap: 7px;
+                font-size: 11px;
+            }
+
+            .ranking-view {
+                margin-top: 4px;
+            }
+
+            .podium {
+                min-height: 250px;
+                gap: 7px;
+                padding-inline: 5px;
+            }
+
+            .podium-card {
+                width: 32%;
+            }
+
+            .podium-avatar {
+                width: 53px;
+                height: 53px;
+                font-size: 19px;
+            }
+
+            .podium-1 .podium-avatar {
+                width: 68px;
+                height: 68px;
+            }
+
+            .podium-name {
+                font-size: 11px;
+            }
+
+            .podium-time {
+                font-size: 10px;
+            }
+
+            .podium-rank {
+                font-size: 8px;
+                letter-spacing: .7px;
+            }
+
+            .podium-stand {
+                height: 65px;
+            }
+
+            .podium-1 .podium-stand {
+                height: 94px;
+            }
+
+            .podium-2 .podium-stand {
+                height: 78px;
+            }
+
+            .podium-3 .podium-stand {
+                height: 55px;
+            }
+
+            #videoGrid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 205px));
+                gap: 10px;
+            }
+        }
+
+        @media (max-width: 390px) {
+            .taskbar-item {
+                flex-direction: column;
+                gap: 4px;
+                padding: 8px 5px;
+            }
+
+            .podium {
+                min-height: 225px;
+            }
+        }
+
+
+        /* FOUR-DESTINATION FOCUS HALL NAVIGATION */
+        .feature-tab {
+            max-width: 1180px;
+            margin: 18px auto 38px;
+            padding: clamp(16px, 3vw, 28px);
+            border: 1px solid rgba(255, 255, 255, .07);
+            border-radius: 24px;
+            background: linear-gradient(145deg, rgba(25, 26, 43, .72), rgba(14, 15, 27, .62));
+            box-shadow: 0 22px 70px rgba(0, 0, 0, .2);
+        }
+
+        .feature-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+
+        .feature-heading h2 {
+            margin: 5px 0 0;
+            color: #f5f5ff;
+            font-size: clamp(21px, 3vw, 29px);
+            letter-spacing: -.8px;
+        }
+
+        .feature-heading p {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .eyebrow {
+            color: #a5a1ff;
+            font-size: 9px;
+            font-weight: 850;
+            letter-spacing: 2.4px;
+        }
+
+        .feature-note {
+            margin-top: 16px;
+            color: var(--muted);
+            font-size: 11px;
+            text-align: center;
+        }
+
+        #screenTabPanel .screen-share-section {
+            display: block;
+            margin: 0;
+        }
+
+        #screenTabPanel .screen-share-section:not(.active) {
+            display: block;
+        }
+
+        #screenTabPanel #screenShareGrid:empty {
+            display: none;
+        }
+
+        #screenTabPanel .screen-share-heading {
+            margin-bottom: 14px;
+        }
+
+        #screenTabPanel #screenShareGrid:empty::after {
+            content: "No active screen shares yet";
+            display: grid;
+            min-height: 210px;
+            place-items: center;
+            border: 1px dashed rgba(255, 255, 255, .15);
+            border-radius: 18px;
+            color: #85869b;
+            font-size: 13px;
+        }
+
+        .study-tab-view .study-status-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 22px;
+            border-radius: 20px;
+        }
+
+        .study-status-indicator {
+            width: 11px;
+            height: 11px;
+            flex: 0 0 11px;
+            border-radius: 50%;
+            background: #64748b;
+            box-shadow: 0 0 0 6px rgba(100, 116, 139, .10);
+        }
+
+        .study-status-indicator.active {
+            background: #34d399;
+            box-shadow: 0 0 0 6px rgba(52, 211, 153, .12), 0 0 20px rgba(52, 211, 153, .55);
+            animation: pulse 1.8s infinite;
+        }
+
+        .study-status-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .study-status-copy strong {
+            color: #f2f2fb;
+            font-size: 14px;
+        }
+
+        .study-status-copy span {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .study-status-time {
+            margin-left: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 5px;
+        }
+
+        .study-status-time span {
+            color: #c4c0ff;
+            font-size: 22px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .study-status-time small {
+            color: #85869b;
+            font-size: 8px;
+            letter-spacing: 1.5px;
+        }
+
+        .study-tab-view .study-button {
+            min-width: 160px;
+        }
+
+        .study-hint {
+            display: flex;
+            align-items: flex-start;
+            gap: 13px;
+            margin-top: 14px;
+            padding: 18px;
+            border-radius: 18px;
+        }
+
+        .study-hint-icon {
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 11px;
+            color: #c4c0ff;
+            background: rgba(129, 140, 248, .14);
+        }
+
+        .study-hint strong {
+            color: #e9e9f6;
+            font-size: 12px;
+        }
+
+        .study-hint p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.8;
+        }
+
+        #statusMsg {
+            margin-top: 14px;
+            text-align: center;
+        }
+
+        .tile-study-time {
+            position: absolute;
+            z-index: 5;
+            top: 10px;
+            right: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            border: 1px solid rgba(255, 255, 255, .13);
+            border-radius: 9px;
+            color: #f4f4ff;
+            background: rgba(9, 10, 19, .72);
+            backdrop-filter: blur(12px);
+            font-size: 9px;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            box-shadow: 0 5px 16px rgba(0, 0, 0, .16);
+        }
+
+        .tile-study-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #73758b;
+        }
+
+        .tile-study-time.is-studying .tile-study-dot {
+            background: #34d399;
+            box-shadow: 0 0 9px rgba(52, 211, 153, .8);
+            animation: pulse 1.6s infinite;
+        }
+
+        .tile-study-time.is-studying {
+            border-color: rgba(52, 211, 153, .25);
+        }
+
+        .bottom-taskbar {
+            gap: 5px;
+        }
+
+        .taskbar-item {
+            min-width: 125px;
+        }
+
+        @media (max-width: 700px) {
+            .bottom-taskbar {
+                width: min(96vw, 510px);
+                gap: 2px;
+                padding: 6px;
+            }
+
+            .taskbar-item {
+                min-width: 0;
+                flex: 1;
+                padding: 9px 5px;
+                flex-direction: column;
+                gap: 4px;
+                font-size: 9px;
+            }
+
+            .taskbar-icon,
+            .taskbar-icon svg {
+                width: 18px;
+                height: 18px;
+            }
+
+            .study-tab-view .study-status-card {
+                flex-wrap: wrap;
+                padding: 16px;
+            }
+
+            .study-status-time {
+                width: 100%;
+                margin: 8px 0 0 27px;
+                align-items: flex-start;
+            }
+
+            .feature-tab {
+                padding: 15px;
+                border-radius: 18px;
+            }
+
+            .feature-heading {
+                align-items: flex-start;
+            }
+        }
+
+
+        /* =========================================
+   FOCUS HALL — MEET-STYLE ROOM EXPERIENCE
+========================================= */
+        body {
+            padding: 18px 20px 112px;
+        }
+
+        #roomScreen {
+            max-width: 1480px;
+        }
+
+        .topbar {
+            margin-bottom: 14px;
+        }
+
+        .members-toggle {
+            display: none;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 9px 12px;
+            color: #d9d8ef;
+            background: rgba(255, 255, 255, .055);
+            font-size: 12px;
+            font-weight: 750;
+            cursor: pointer;
+        }
+
+        .view-tabs {
+            display: flex;
+            gap: 7px;
+            width: max-content;
+            max-width: 100%;
+            padding: 5px;
+            margin: 0 auto 16px;
+            border: 1px solid rgba(255, 255, 255, .09);
+            border-radius: 15px;
+            background: rgba(16, 17, 30, .78);
+        }
+
+        .view-tab {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 10px 20px;
+            border: 1px solid transparent;
+            border-radius: 11px;
+            background: transparent;
+            color: #9697ad;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: .2s ease;
+        }
+
+        .view-tab:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, .05);
+        }
+
+        .view-tab.active {
+            color: #fff;
+            border-color: rgba(165, 155, 255, .2);
+            background: linear-gradient(135deg, rgba(99, 102, 241, .28), rgba(139, 92, 246, .17));
+            box-shadow: 0 5px 20px rgba(99, 102, 241, .12);
+        }
+
+        .view-tab-icon {
+            display: grid;
+            place-items: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 7px;
+            background: rgba(255, 255, 255, .07);
+            font-size: 14px;
+        }
+
+        .room-workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 285px;
+            gap: 18px;
+            align-items: start;
+        }
+
+        .room-main-column {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        #videoGrid {
+            grid-template-columns: repeat(auto-fit, minmax(190px, 240px));
+            justify-content: start;
+            align-content: start;
+            gap: 14px;
+            min-height: 140px;
+            padding: 0;
+        }
+
+        .video-tile {
+            width: 100%;
+        }
+
+        .members-panel {
+            position: sticky;
+            top: 16px;
+            height: auto;
+            max-height: calc(100vh - 125px);
+            overflow: auto;
+            padding: 16px;
+        }
+
+        .members-panel .panel-header {
+            margin-bottom: 12px;
+        }
+
+        .room-screen-section {
+            display: none;
+            margin: 0;
+        }
+
+        .room-screen-section.active {
+            display: block;
+            animation: tabReveal .25s ease both;
+        }
+
+        .room-screen-section .screen-share-heading {
+            margin-bottom: 10px;
+        }
+
+        #screenShareGrid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+            gap: 12px;
+        }
+
+        #screenShareGrid:empty {
+            display: none;
+        }
+
+        .study-mini {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 11px 15px;
+            border-radius: 15px;
+        }
+
+        .study-mini-left {
+            display: flex;
+            align-items: center;
+            gap: 13px;
+            min-width: 0;
+        }
+
+        .study-mini .study-status-copy {
+            gap: 3px;
+        }
+
+        .study-mini .study-status-copy strong {
+            font-size: 12px;
+        }
+
+        .study-mini .study-status-copy span {
+            font-size: 10px;
+        }
+
+        .study-mini .study-status-indicator {
+            width: 8px;
+            height: 8px;
+            flex-basis: 8px;
+        }
+
+        .study-mini .study-status-time {
+            margin: 0 0 0 auto;
+            align-items: flex-end;
+        }
+
+        .study-mini .study-status-time span {
+            font-size: 17px;
+        }
+
+        .study-mini .study-status-time small {
+            font-size: 8px;
+        }
+
+        .call-dock {
+            position: fixed;
+            z-index: 1100;
+            left: 50%;
+            bottom: max(16px, env(safe-area-inset-bottom));
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: max-content;
+            max-width: calc(100vw - 24px);
+            padding: 10px 13px;
+            border: 1px solid rgba(255, 255, 255, .13);
+            border-radius: 22px;
+            background: rgba(17, 18, 31, .91);
+            box-shadow: 0 18px 65px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .08);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+
+        .call-dock .dock-control {
+            min-width: 76px;
+            min-height: 58px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 7px 13px;
+            border: 1px solid rgba(255, 255, 255, .08);
+            border-radius: 15px;
+            color: #d8d8e8;
+            background: rgba(255, 255, 255, .055);
+            cursor: pointer;
+            transition: background .2s, border .2s, transform .2s;
+        }
+
+        .call-dock .dock-control:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, .11);
+            border-color: rgba(255, 255, 255, .17);
+        }
+
+        .call-dock .dock-control svg {
+            width: 21px;
+            height: 21px;
+        }
+
+        .call-dock .dock-control span:not(.dock-label) {
+            font-size: 10px;
+        }
+
+        .call-dock .dock-control .dock-label {
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .call-dock .dock-control.active {
+            color: #fff;
+            background: rgba(99, 102, 241, .25);
+            border-color: rgba(129, 140, 248, .35);
+        }
+
+        .call-dock #screenShareBtn.active {
+            background: rgba(190, 24, 93, .22);
+            border-color: rgba(244, 63, 94, .4);
+        }
+
+        .call-dock .leave-control {
+            min-width: 72px;
+            color: #fff;
+            background: linear-gradient(135deg, #be123c, #e11d48);
+            border-color: rgba(251, 113, 133, .35);
+        }
+
+        .call-dock .leave-control:hover {
+            background: linear-gradient(135deg, #e11d48, #fb3b61);
+        }
+
+        .call-dock .dock-symbol {
+            font-size: 21px;
+            line-height: 21px;
+            font-weight: 800;
+        }
+
+        #toggleBtn,
+        #screenShareBtn,
+        #studyBtn {
+            margin: 0;
+        }
+
+        #toggleBtn span,
+        #screenShareBtn span,
+        #studyBtn span {
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        #statusMsg {
+            min-height: 0;
+        }
+
+        .ranking-view {
+            max-width: 1080px;
+            margin: 8px auto 35px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+            animation: tabReveal .3s ease both;
+        }
+
+        @media(max-width:900px) {
+            body {
+                padding: 12px 12px 105px;
+            }
+
+            .room-workspace {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .members-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 7px;
+                margin-left: auto;
+            }
+
+            .members-panel {
+                position: fixed !important;
+                z-index: 1300;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: min(330px, 86vw);
+                max-height: none;
+                height: 100dvh;
+                border-radius: 22px 0 0 22px;
+                transform: translateX(110%);
+                transition: transform .28s ease;
+                padding: 22px 17px;
+                overflow-y: auto;
+                box-shadow: -25px 0 70px rgba(0, 0, 0, .4);
+            }
+
+            .members-panel.drawer-open {
+                transform: translateX(0);
+            }
+
+            .members-backdrop {
+                position: fixed;
+                z-index: 1250;
+                inset: 0;
+                background: rgba(2, 3, 10, .58);
+                opacity: 0;
+                visibility: hidden;
+                transition: .25s ease;
+            }
+
+            .members-backdrop.visible {
+                opacity: 1;
+                visibility: visible;
+            }
+
+            #videoGrid {
+                grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+            }
+        }
+
+        @media(max-width:520px) {
+            .topbar {
+                padding: 11px 12px;
+                gap: 8px;
+            }
+
+            .topbar h2 {
+                font-size: 13px;
+            }
+
+            .brand-icon {
+                width: 36px;
+                height: 36px;
+            }
+
+            .user-chip {
+                padding: 5px 8px 5px 5px;
+                font-size: 10px;
+            }
+
+            .user-chip .avatar {
+                width: 24px;
+                height: 24px;
+            }
+
+            .members-toggle {
+                padding: 8px 9px;
+                font-size: 10px;
+            }
+
+            .view-tabs {
+                width: 100%;
+            }
+
+            .view-tab {
+                flex: 1;
+                justify-content: center;
+                padding: 10px 8px;
+            }
+
+            #videoGrid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 9px;
+            }
+
+            .video-tile {
+                min-height: 120px;
+                border-radius: 14px;
+            }
+
+            .study-mini {
+                padding: 10px 11px;
+            }
+
+            .study-mini .study-status-copy span {
+                max-width: 185px;
+            }
+
+            .study-mini .study-status-time span {
+                font-size: 15px;
+            }
+
+            .call-dock {
+                width: calc(100vw - 16px);
+                gap: 5px;
+                padding: 7px;
+                bottom: max(8px, env(safe-area-inset-bottom));
+                border-radius: 18px;
+            }
+
+            .call-dock .dock-control {
+                flex: 1;
+                min-width: 0;
+                min-height: 55px;
+                padding: 6px 3px;
+                border-radius: 12px;
+            }
+
+            .call-dock .dock-control svg {
+                width: 19px;
+                height: 19px;
+            }
+
+            .call-dock .dock-control .dock-label,
+            #toggleBtn span,
+            #screenShareBtn span,
+            #studyBtn span {
+                font-size: 9px;
+            }
+        }
+
+        /* --- Focus Hall polish: equal media tiles + reactions --- */
+        #videoGrid {
+            display: grid;
+            /* Keep webcam and screen-share tiles intentionally compact,
+       even when only one or two people are in the room. */
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 360px));
+            align-items: start;
+            justify-content: center;
+            gap: 16px;
+            width: 100%;
+            max-width: 780px;
+            margin-inline: auto;
+        }
+
+        #videoGrid .video-tile,
+        #videoGrid .screen-share-tile {
+            width: 100%;
+            max-width: 360px;
+            min-width: 0;
+            min-height: 0;
+            aspect-ratio: 16 / 9;
+            border: 1px solid rgba(255, 255, 255, .10);
+            border-radius: 20px;
+            overflow: hidden;
+            background: linear-gradient(145deg, #17192a, #0e101b);
+            box-shadow: 0 16px 42px rgba(0, 0, 0, .28), 0 0 0 1px rgba(255, 255, 255, .025) inset;
+            transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+        }
+
+        #videoGrid .video-tile:hover {
+            transform: translateY(-3px);
+            border-color: rgba(165, 155, 255, .34);
+            box-shadow: 0 20px 48px rgba(0, 0, 0, .34), 0 0 24px rgba(120, 110, 255, .10);
+        }
+
+        #videoGrid .screen-share-tile video {
+            object-fit: contain;
+            background: #080a12;
+        }
+
+        #videoGrid .screen-share-tile .placeholder {
+            background: #0c0e18;
+        }
+
+        #screenShareSection {
+            display: none !important;
+        }
+
+        #screenShareGrid {
+            display: none !important;
+        }
+
+        .media-kind {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 5;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 9px;
+            border-radius: 999px;
+            color: #e9e8ff;
+            background: rgba(15, 16, 30, .76);
+            border: 1px solid rgba(255, 255, 255, .12);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .35px;
+            backdrop-filter: blur(12px);
+        }
+
+        .media-kind svg {
+            width: 13px;
+            height: 13px;
+        }
+
+        .video-tile .name-tag {
+            z-index: 6;
+        }
+
+        .call-dock {
+            gap: 10px;
+            padding: 12px 14px;
+            border: 1px solid rgba(255, 255, 255, .13);
+            box-shadow: 0 18px 55px rgba(0, 0, 0, .42), inset 0 1px 0 rgba(255, 255, 255, .08);
+        }
+
+        .dock-control {
+            transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+        }
+
+        .dock-control:hover {
+            transform: translateY(-3px);
+        }
+
+        .reaction-wrap {
+            position: relative;
+        }
+
+        .reaction-menu {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 15px);
+            z-index: 80;
+            width: 220px;
+            padding: 9px;
+            border-radius: 17px;
+            background: rgba(20, 21, 37, .97);
+            border: 1px solid rgba(255, 255, 255, .13);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, .45);
+            backdrop-filter: blur(18px);
+            opacity: 0;
+            visibility: hidden;
+            transform: translate(-50%, 9px) scale(.97);
+            transform-origin: bottom center;
+            transition: .2s ease;
+        }
+
+        .reaction-menu.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, 0) scale(1);
+        }
+
+        .reaction-menu button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 11px 12px;
+            border: 0;
+            border-radius: 11px;
+            color: #f4f3ff;
+            background: transparent;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .reaction-menu button:hover {
+            background: rgba(130, 120, 255, .16);
+        }
+
+        .reaction-menu button span:first-child {
+            font-size: 20px;
+            width: 25px;
+            text-align: center;
+        }
+
+        #reactionLayer {
+            position: fixed;
+            z-index: 1000;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 9px;
+            width: min(92vw, 390px);
+            pointer-events: none;
+        }
+
+        .reaction-toast {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            width: 100%;
+            padding: 11px 14px;
+            border-radius: 16px;
+            color: #fff;
+            background: rgba(24, 25, 43, .94);
+            border: 1px solid rgba(185, 178, 255, .25);
+            box-shadow: 0 15px 45px rgba(0, 0, 0, .42), 0 0 24px rgba(124, 112, 255, .13);
+            backdrop-filter: blur(18px);
+            cursor: pointer;
+            animation: reactionIn .42s cubic-bezier(.18, .9, .25, 1.2) both;
+        }
+
+        .reaction-toast .reaction-emoji {
+            font-size: 25px;
+            width: 34px;
+            text-align: center;
+        }
+
+        .reaction-toast .reaction-copy {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .reaction-toast strong {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 3px;
+        }
+
+        .reaction-toast small {
+            display: block;
+            color: #a6a6bd;
+            font-size: 10px;
+        }
+
+        .reaction-toast .reaction-dismiss {
+            color: #8d8ea5;
+            font-size: 16px;
+        }
+
+        .reaction-toast.removing {
+            animation: reactionOut .22s ease forwards;
+        }
+
+        @keyframes reactionIn {
+            from {
+                opacity: 0;
+                transform: translateY(-18px) scale(.92);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes reactionOut {
+            to {
+                opacity: 0;
+                transform: translateY(-12px) scale(.94);
+            }
+        }
+
+        @media (max-width:650px) {
+            #videoGrid {
+                grid-template-columns: minmax(0, min(100%, 360px));
+                justify-content: center;
+                gap: 12px;
+                max-width: 100%;
+            }
+
+            #videoGrid .video-tile,
+            #videoGrid .screen-share-tile {
+                max-width: 360px;
+                border-radius: 16px;
+            }
+
+            .call-dock {
+                gap: 6px;
+                padding: 9px 8px;
+            }
+
+            .call-dock .dock-control {
+                min-width: 0;
+                padding: 9px 8px;
+            }
+
+            .call-dock .dock-label,
+            .call-dock #toggleText,
+            .call-dock #screenShareBtnText,
+            .call-dock #studyBtnText {
+                font-size: 9px;
+            }
+
+            .reaction-menu {
+                left: 0;
+                transform: translate(0, 9px) scale(.97);
+            }
+
+            .reaction-menu.open {
+                transform: translate(0, 0) scale(1);
+            }
+        }
+    </style>
 </head>
 
 <body>
-
-<!-- JOIN SCREEN -->
-<div id="joinScreen">
-    <div class="join-card glass">
-        <div class="logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="white"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="5" width="13" height="14" rx="2"/>
-                <path d="m16 10 5-3v10l-5-3"/>
-            </svg>
-        </div>
-
-        <h1>Focus Hall</h1>
-        <p>Join your study room, stay focused, and make progress together.</p>
-
-        <div class="field">
-            <label for="nameInput">Your Name</label>
-            <input id="nameInput" type="text" maxlength="30"
-                   placeholder="Enter your name" autocomplete="name">
-        </div>
-
-        <div class="field">
-            <label for="passwordInput">Account Password</label>
-            <input id="passwordInput" type="password" minlength="8"
-                   maxlength="128" placeholder="Create or enter your password"
-                   autocomplete="current-password">
-            <small class="field-hint">
-                Use the same password to access the same study identity on another device.
-            </small>
-        </div>
-
-        <div class="field">
-            <label for="roomInput">Room Code</label>
-            <input id="roomInput" type="text" maxlength="40"
-                   placeholder="e.g. study-room-01" autocomplete="off">
-        </div>
-
-        <button id="joinBtn" class="btn-primary">Join Study Room</button>
-        <div class="error" id="errorMsg"></div>
-    </div>
-</div>
-
-<!-- ROOM SCREEN -->
-<div id="roomScreen">
-    <header class="topbar glass">
-        <div class="topbar-left">
-            <div class="brand-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="white"
-                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M4 19V5"/>
-                    <path d="M4 19h16"/>
-                    <path d="m7 15 4-5 3 3 5-7"/>
+    <!-- JOIN SCREEN -->
+    <div id="joinScreen">
+        <div class="join-card glass">
+            <div class="logo">
+                <svg fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    viewbox="0 0 24 24">
+                    <rect height="14" rx="2" width="13" x="3" y="5"></rect>
+                    <path d="m16 10 5-3v10l-5-3"></path>
                 </svg>
             </div>
-            <h2>Focus Hall <span>/ <span id="roomNameLabel"></span></span></h2>
-        </div>
-        <div class="user-chip">
-            <span class="avatar" id="userAvatar">?</span>
-            <span id="userNameLabel"></span>
-        </div>
-    </header>
-
-    <main class="layout">
-        <section>
-            <div id="videoGrid"></div>
-
-            <div class="controls">
-                <button id="studyBtn" class="control-button study-button">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M12 6v6l4 2"/>
-                    </svg>
-                    <span id="studyBtnText">Start Studying</span>
-                </button>
-
-                <button id="toggleBtn" class="control-button camera-button">
-                    <svg id="camIcon" viewBox="0 0 24 24" fill="none"
-                         stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m23 7-7 5 7 5V7z"/>
-                        <rect x="1" y="5" width="15" height="14" rx="2"/>
-                    </svg>
-                    <span id="toggleText">Share Camera</span>
-                </button>
+            <h1>Focus Hall</h1>
+            <p>Join your study room, stay focused, and make progress together.</p>
+            <div class="field">
+                <label for="nameInput">Your Name</label>
+                <input autocomplete="name" id="nameInput" maxlength="30" placeholder="Enter your name" type="text" />
             </div>
-
-            <section class="study-panel glass">
-                <div class="study-info">
-                    <div id="studyIndicator" class="study-indicator"></div>
-                    <div>
-                        <div id="studyStateText">Study session inactive</div>
-                        <div class="study-subtitle" id="presenceText">
-                            Start studying to begin recording your time
+            <div class="field">
+                <label for="passwordInput">Account Password</label>
+                <input autocomplete="current-password" id="passwordInput" maxlength="128" minlength="8"
+                    placeholder="Create or enter your password" type="password" />
+                <small class="field-hint">
+                    Use the same password to access the same study identity on another device.
+                </small>
+            </div>
+            <button class="btn-primary" id="joinBtn">Join Study Room</button>
+            <div class="error" id="errorMsg"></div>
+        </div>
+    </div>
+    <!-- ROOM SCREEN -->
+    <div id="roomScreen">
+        <header class="topbar glass">
+            <div class="topbar-left">
+                <div class="brand-icon">
+                    <svg fill="none" stroke="white" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        viewbox="0 0 24 24">
+                        <path d="M4 19V5"></path>
+                        <path d="M4 19h16"></path>
+                        <path d="m7 15 4-5 3 3 5-7"></path>
+                    </svg>
+                </div>
+                <h2>Focus Hall <span>/ <span id="roomNameLabel"></span></span></h2>
+            </div>
+            <div class="user-chip">
+                <span class="avatar" id="userAvatar">?</span>
+                <span id="userNameLabel"></span>
+            </div>
+            <button aria-controls="membersPanel" aria-expanded="false" class="members-toggle" id="membersToggle"
+                type="button">☷ Participants</button>
+        </header>
+        <div aria-label="Room views" class="view-tabs" role="tablist"><button aria-selected="true"
+                    class="view-tab active" data-view="room" role="tab" type="button"><span
+                        class="view-tab-icon">⌂</span><span>Room</span></button><button aria-selected="false"
+                    class="view-tab" data-view="ranking" role="tab" type="button"><span
+                        class="view-tab-icon">♜</span><span>Leaderboard</span></button></div>
+        <section class="room-view tab-panel active" id="roomTabPanel">
+            
+            <div class="room-workspace">
+                <main class="room-main-column">
+                    <section class="screen-share-section room-screen-section" id="screenShareSection">
+                        <div class="screen-share-heading"><span><i></i> Live screen share</span><span
+                                id="screenShareLabel">Shared screen</span></div>
+                        <div id="screenShareGrid"></div>
+                    </section>
+                    <section class="study-mini glass" id="studyMiniWidget">
+                        <div class="study-mini-left"><span class="study-status-indicator" id="studyIndicator"></span>
+                            <div class="study-status-copy"><strong id="studyStateText">Study session
+                                    inactive</strong><span id="presenceText">Start studying to begin recording your
+                                    time</span></div>
                         </div>
+                        <div class="study-status-time"><span id="studyTimer">00:00:00</span><small>TOTAL STUDY
+                                TIME</small></div>
+                    </section>
+                    <div id="videoGrid"></div>
+                    <div id="statusMsg"></div>
+                </main>
+                <aside class="members-panel glass" id="membersPanel">
+                    <div class="panel-header">
+                        <h3>Participants</h3>
+                        <span class="count-badge" id="memberCount">1</span>
                     </div>
-                </div>
-                <div>
-                    <div class="study-timer" id="studyTimer">00:00:00</div>
-                    <div class="study-subtitle">Your study time</div>
-                </div>
-            </section>
+                    <div class="member-list" id="memberList"></div>
+                </aside>
+            </div>
+        </section>
 
+
+        <section class="ranking-view tab-panel" id="rankingTabPanel">
             <section class="leaderboard-panel glass">
                 <div class="leaderboard-header">
                     <div class="leaderboard-title">🏆 Study Leaderboard</div>
@@ -804,1310 +2491,1761 @@ button { color: inherit; }
                         <button class="period-tab" data-period="all">All Time</button>
                     </div>
                 </div>
-                <div id="leaderboardList" class="leaderboard-list">
+                <div class="podium" id="podium"></div>
+                <div class="leaderboard-list" id="leaderboardList">
                     <div class="empty-leaderboard">Study statistics will appear here.</div>
                 </div>
             </section>
-
-            <div id="statusMsg"></div>
         </section>
 
-        <aside class="members-panel glass">
-            <div class="panel-header">
-                <h3>Participants</h3>
-                <span class="count-badge" id="memberCount">1</span>
-            </div>
-            <div class="member-list" id="memberList"></div>
-        </aside>
-    </main>
-</div>
-
-<script type="module">
-
-/* =========================================
-   LOW-DATA PROFILE — بهینه‌ترین تنظیمات WebRTC
-========================================= */
-
-// حداقل کیفیت ممکن برای دیده شدن چهره‌ها — ۱۶۰×۹۰، ۱ فریم بر ثانیه، سقف ۸ kbps
-const VIDEO_SEND_PROFILE = {
-    width: 352,
-    height: 288,
-    fps: 6,
-    maxBitrate: 100000       // bits/second — hard cap per sender
-};
-
-// فاصله‌ی heartbeat/پروفایل — از ۱۵ ثانیه به ۶۰ ثانیه
-const PROFILE_SYNC_INTERVAL = 60000;
-
-// فاصله‌ی clock tick
-const CLOCK_TICK_MS = 1000;
-
-// حداکثر gap قابل قبول (بیشتر از این یعنی sleep/resume — نادیده بگیر)
-const MAX_TICK_GAP_MS = 5000;
-
-// تنظیمات کیفیت بصری سمت گیرنده (بدون مصرف اینترنت اضافی)
-const ENHANCEMENT_ENABLED = true;
-
-/* =========================================
-   DOM
-========================================= */
-
-const $ = id => document.getElementById(id);
-
-const joinScreen = $("joinScreen");
-const roomScreen = $("roomScreen");
-const nameInput = $("nameInput");
-const passwordInput = $("passwordInput");
-const roomInput = $("roomInput");
-const joinBtn = $("joinBtn");
-const errorMsg = $("errorMsg");
-const videoGrid = $("videoGrid");
-const memberList = $("memberList");
-const memberCount = $("memberCount");
-const toggleBtn = $("toggleBtn");
-const toggleText = $("toggleText");
-const studyBtn = $("studyBtn");
-const studyBtnText = $("studyBtnText");
-const studyTimer = $("studyTimer");
-const studyIndicator = $("studyIndicator");
-const studyStateText = $("studyStateText");
-const presenceText = $("presenceText");
-const leaderboardList = $("leaderboardList");
-const statusMsg = $("statusMsg");
-
-/* =========================================
-   STATE
-========================================= */
-
-let peer = null;
-let socket = null;
-
-let myId = "";
-let userId = "";
-let userName = "";
-let roomName = "";
-
-let shareStream = null;
-let isCamOn = false;
-let isStudying = false;
-
-let lastSaveTime = 0;
-
-// Study clock — کاملاً مستقل، مقاوم به مینیمایز
-let studyClockInterval = null;
-let lastTickTime = 0;
-let pendingSeconds = 0;
-
-let selectedPeriod = "today";
-
-const outgoingCalls = new Map();
-const incomingCalls = new Map();
-const remoteMembers = new Map();
-const remoteProfiles = new Map();
-
-// canvas enhancement — peerId → { canvas, ctx, raf, source }
-const enhancementMap = new Map();
-
-let ownStats = { version: 1, days: {} };
-
-const STATS_KEY = "focus_hall_stats_";
-const REMOTE_KEY = "focus_hall_remote_profiles";
-
-/* =========================================
-   HELPERS
-========================================= */
-
-function setStatus(message, isError = false) {
-    statusMsg.textContent = message;
-    statusMsg.classList.toggle("error-text", isError);
-}
-
-function formatTime(seconds) {
-    seconds = Math.max(0, Math.floor(seconds || 0));
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return [
-        String(hours).padStart(2, "0"),
-        String(minutes).padStart(2, "0"),
-        String(secs).padStart(2, "0")
-    ].join(":");
-}
-
-function tehranDate(date = new Date()) {
-    const parts = new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Asia/Tehran",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit"
-    }).formatToParts(date);
-    const get = type => parts.find(p => p.type === type)?.value;
-    return `${get("year")}-${get("month")}-${get("day")}`;
-}
-
-function shiftDate(dateString, amount) {
-    const date = new Date(`${dateString}T00:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + amount);
-    return date.toISOString().slice(0, 10);
-}
-
-function getWeekDates() {
-    const today = tehranDate();
-    const date = new Date(`${today}T00:00:00Z`);
-    const weekday = date.getUTCDay();
-    const daysSinceMonday = (weekday + 6) % 7;
-    const monday = shiftDate(today, -daysSinceMonday);
-    const result = [];
-    for (let i = 0; i <= daysSinceMonday; i++) {
-        result.push(shiftDate(monday, i));
-    }
-    return result;
-}
-
-function getPeriodSeconds(days, period) {
-    if (!days || typeof days !== "object") return 0;
-    if (period === "today") return Number(days[tehranDate()] || 0);
-    if (period === "yesterday") return Number(days[shiftDate(tehranDate(), -1)] || 0);
-    if (period === "week") {
-        return getWeekDates().reduce((sum, date) => sum + Number(days[date] || 0), 0);
-    }
-    return Object.values(days).reduce((sum, value) => sum + Number(value || 0), 0);
-}
-
-async function hashPassword(password) {
-    const data = new TextEncoder().encode(password);
-    const digest = await crypto.subtle.digest("SHA-256", data);
-    return Array.from(new Uint8Array(digest))
-        .map(byte => byte.toString(16).padStart(2, "0"))
-        .join("");
-}
-
-function loadOwnStats() {
-    try {
-        const raw = localStorage.getItem(STATS_KEY + userId);
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            if (parsed && parsed.days && typeof parsed.days === "object") {
-                ownStats = { version: 1, days: parsed.days };
-            }
-        }
-    } catch (error) {
-        console.warn("Could not load local study statistics:", error);
-    }
-}
-
-function saveOwnStats() {
-    try {
-        localStorage.setItem(STATS_KEY + userId, JSON.stringify(ownStats));
-    } catch (error) {
-        console.warn("Could not save study statistics:", error);
-    }
-}
-
-function loadRemoteProfiles() {
-    try {
-        const raw = localStorage.getItem(REMOTE_KEY);
-        const parsed = raw ? JSON.parse(raw) : {};
-        if (parsed && typeof parsed === "object") {
-            Object.entries(parsed).forEach(([id, profile]) => {
-                if (id !== userId && profile && profile.data) {
-                    remoteProfiles.set(id, profile);
-                }
-            });
-        }
-    } catch (error) {
-        console.warn("Could not load remote profiles:", error);
-    }
-}
-
-function saveRemoteProfiles() {
-    try {
-        const data = {};
-        remoteProfiles.forEach((profile, id) => { data[id] = profile; });
-        localStorage.setItem(REMOTE_KEY, JSON.stringify(data));
-    } catch (error) {
-        console.warn("Could not save remote profiles:", error);
-    }
-}
-
-function mergeDays(oldDays, newDays) {
-    const merged = { ...(oldDays || {}) };
-    for (const [date, seconds] of Object.entries(newDays || {})) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-        const value = Number(seconds);
-        if (!Number.isFinite(value) || value < 0) continue;
-        merged[date] = Math.max(Number(merged[date] || 0), Math.floor(value));
-    }
-    return merged;
-}
-
-/* =========================================
-   PROFILE SYNC
-========================================= */
-
-function sendMyProfile() {
-    if (!socket?.connected || !userId) return;
-    socket.emit("study-profile", {
-        data: { version: 1, days: ownStats.days }
-    });
-}
-
-function receiveProfile(payload) {
-    if (!payload || !payload.userId || payload.userId === userId) return;
-    if (!payload.data || typeof payload.data !== "object") return;
-
-    const existing = remoteProfiles.get(payload.userId);
-    const mergedDays = mergeDays(
-        existing?.data?.days || {},
-        payload.data.days || {}
-    );
-
-    remoteProfiles.set(payload.userId, {
-        name: payload.name || existing?.name || "Participant",
-        data: { version: 1, days: mergedDays }
-    });
-
-    saveRemoteProfiles();
-    renderLeaderboard();
-}
-
-/* =========================================
-   CANVAS ENHANCEMENT (بدون مصرف اینترنت اضافی)
-========================================= */
-
-function startEnhancement(tile, video, peerId) {
-    if (!ENHANCEMENT_ENABLED) return;
-    if (enhancementMap.has(peerId)) return;
-
-    const canvas = document.createElement("canvas");
-    canvas.className = "enhanced-video";
-    tile.appendChild(canvas);
-
-    const ctx = canvas.getContext("2d", { alpha: false });
-    const scratch = document.createElement("canvas");
-    const scratchCtx = scratch.getContext("2d", { willReadFrequently: true });
-
-    const state = { canvas, ctx, scratch, scratchCtx, video, raf: 0, lastDraw: 0 };
-    enhancementMap.set(peerId, state);
-    tile.classList.add("enhanced");
-
-    const render = (now) => {
-        if (!enhancementMap.has(peerId)) return;
-
-        if (video.readyState >= 2 && now - state.lastDraw >= 200) {
-            state.lastDraw = now;
-
-            const w = VIDEO_SEND_PROFILE.width;
-            const h = VIDEO_SEND_PROFILE.height;
-
-            if (scratch.width !== w) {
-                scratch.width = w;
-                scratch.height = h;
-                canvas.width = w * 2;
-                canvas.height = h * 2;
-            }
-
-            try {
-                state.scratchCtx.drawImage(video, 0, 0, w, h);
-                const frame = state.scratchCtx.getImageData(0, 0, w, h);
-                const src = frame.data;
-                const dst = new Uint8ClampedArray(src);
-                const k = [0, -0.15, 0, -0.15, 1.6, -0.15, 0, -0.15, 0];
-
-                for (let y = 1; y < h - 1; y++) {
-                    for (let x = 1; x < w - 1; x++) {
-                        const i = (y * w + x) * 4;
-                        for (let c = 0; c < 3; c++) {
-                            let v = 0, kk = 0;
-                            for (let dy = -1; dy <= 1; dy++) {
-                                for (let dx = -1; dx <= 1; dx++) {
-                                    const p = ((y + dy) * w + (x + dx)) * 4 + c;
-                                    v += src[p] * k[kk++];
-                                }
-                            }
-                            dst[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
-                        }
-                    }
-                }
-                frame.data.set(dst);
-                state.scratchCtx.putImageData(frame, 0, 0);
-
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = "high";
-                ctx.drawImage(scratch, 0, 0, canvas.width, canvas.height);
-            } catch (e) {
-                stopEnhancement(peerId);
-                return;
-            }
-        }
-
-        state.raf = requestAnimationFrame(render);
-    };
-
-    state.raf = requestAnimationFrame(render);
-}
-
-function stopEnhancement(peerId) {
-    const state = enhancementMap.get(peerId);
-    if (!state) return;
-    if (state.raf) cancelAnimationFrame(state.raf);
-    if (state.canvas) state.canvas.remove();
-    enhancementMap.delete(peerId);
-
-    const tile = document.getElementById(`tile-${peerId}`);
-    if (tile) tile.classList.remove("enhanced");
-}
-
-/* =========================================
-   VIDEO TILE
-========================================= */
-
-function createVideoTile(id, name, isMe = false) {
-    let tile = document.getElementById(`tile-${id}`);
-    if (tile) return tile;
-
-    tile = document.createElement("div");
-    tile.className = "video-tile";
-    tile.id = `tile-${id}`;
-
-    const placeholder = document.createElement("div");
-    placeholder.className = "placeholder";
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar-lg";
-    avatar.textContent = name.charAt(0).toUpperCase() || "?";
-
-    const placeholderText = document.createElement("div");
-    placeholderText.className = "txt";
-    placeholderText.textContent = "Camera is off";
-
-    placeholder.append(avatar, placeholderText);
-
-    const video = document.createElement("video");
-    video.autoplay = true;
-    video.playsInline = true;
-    video.muted = isMe;
-
-    const nameTag = document.createElement("div");
-    nameTag.className = "name-tag";
-
-    const dot = document.createElement("span");
-    dot.className = "dot";
-    dot.id = `dot-${id}`;
-
-    const nameText = document.createElement("span");
-    nameText.className = "name-text";
-    nameText.textContent = isMe ? `${name} (You)` : name;
-
-    nameTag.append(dot, nameText);
-    tile.append(placeholder, video, nameTag);
-
-    if (isMe) {
-        const youTag = document.createElement("div");
-        youTag.className = "you-tag";
-        youTag.textContent = "YOU";
-        tile.appendChild(youTag);
-        tile.classList.add("mirror");
-    }
-
-    videoGrid.appendChild(tile);
-    return tile;
-}
-
-function setTileStream(id, stream) {
-    const tile = document.getElementById(`tile-${id}`);
-    if (!tile) return;
-
-    const video = tile.querySelector("video");
-
-    if (!stream) {
-        stopEnhancement(id);
-        video.srcObject = null;
-        tile.classList.remove("has-video");
-        return;
-    }
-
-    const hasLiveVideo = stream.getVideoTracks().some(t => t.readyState === "live");
-    if (!hasLiveVideo) {
-        stopEnhancement(id);
-        video.srcObject = null;
-        tile.classList.remove("has-video");
-        return;
-    }
-
-    video.srcObject = stream;
-    video.play().catch(() => {});
-    tile.classList.add("has-video");
-
-    const isLocal = (id === myId);
-    if (!isLocal) {
-        startEnhancement(tile, video, id);
-    }
-}
-
-function removeVideoTile(id) {
-    stopEnhancement(id);
-    const tile = document.getElementById(`tile-${id}`);
-    if (tile) tile.remove();
-}
-
-/* =========================================
-   MEMBER LIST
-========================================= */
-
-function renderMembers() {
-    const members = [];
-    members.push({
-        peerId: myId,
-        userId,
-        name: userName,
-        camOn: isCamOn,
-        studying: isStudying,
-        me: true
-    });
-
-    remoteMembers.forEach(member => {
-        members.push({ ...member, me: false });
-    });
-
-    memberCount.textContent = String(members.length);
-    memberList.replaceChildren();
-
-    members.forEach(member => {
-        const item = document.createElement("div");
-        item.className = "member-item" + (member.me ? " me" : "");
-
-        const avatar = document.createElement("div");
-        avatar.className = "member-avatar";
-        avatar.textContent = (member.name || "?").charAt(0).toUpperCase();
-
-        const name = document.createElement("div");
-        name.className = "member-name";
-        name.textContent = member.name || "Participant";
-
-        if (member.me) {
-            const you = document.createElement("span");
-            you.className = "you-label";
-            you.textContent = " YOU";
-            name.appendChild(you);
-        }
-
-        const status = document.createElement("span");
-        status.className = "member-status" + (member.camOn ? " cam-on" : "");
-
-        item.append(avatar, name);
-
-        if (member.studying) {
-            const study = document.createElement("span");
-            study.className = "member-study";
-            study.textContent = "STUDY";
-            item.appendChild(study);
-        }
-
-        item.appendChild(status);
-        memberList.appendChild(item);
-    });
-}
-
-/* =========================================
-   LEADERBOARD
-========================================= */
-
-function renderLeaderboard() {
-    const participants = [];
-    participants.push({ id: userId, name: userName, days: ownStats.days });
-
-    remoteProfiles.forEach((profile, id) => {
-        const member = remoteMembers.get(id);
-        participants.push({
-            id,
-            name: member?.name || profile.name || "Participant",
-            days: profile.data?.days || {}
-        });
-    });
-
-    const ranked = participants
-        .map(person => ({
-            ...person,
-            seconds: getPeriodSeconds(person.days, selectedPeriod)
-        }))
-        .sort((a, b) => b.seconds - a.seconds);
-
-    leaderboardList.replaceChildren();
-
-    if (!ranked.length || ranked.every(person => person.seconds === 0)) {
-        const empty = document.createElement("div");
-        empty.className = "empty-leaderboard";
-        empty.textContent = "No study time recorded for this period yet.";
-        leaderboardList.appendChild(empty);
-        return;
-    }
-
-    ranked.forEach((person, index) => {
-        const row = document.createElement("div");
-        row.className = "leaderboard-item";
-
-        const rank = document.createElement("div");
-        rank.className = "leaderboard-rank";
-        rank.textContent = String(index + 1);
-
-        const name = document.createElement("div");
-        name.className = "leaderboard-name";
-        name.textContent = person.name;
-
-        const time = document.createElement("div");
-        time.className = "leaderboard-time";
-        time.textContent = formatTime(person.seconds);
-
-        row.append(rank, name, time);
-        leaderboardList.appendChild(row);
-    });
-}
-
-document.querySelectorAll(".period-tab").forEach(button => {
-    button.addEventListener("click", () => {
-        document.querySelectorAll(".period-tab").forEach(item => {
-            item.classList.remove("active");
-        });
-        button.classList.add("active");
-        selectedPeriod = button.dataset.period;
-        renderLeaderboard();
-    });
-});
-
-/* =========================================
-   CAMERA SHARING — very low bitrate
-========================================= */
-
-async function ensureShareStream() {
-    if (shareStream && shareStream.getVideoTracks().some(t => t.readyState === "live")) {
-        return shareStream;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("Camera access is unavailable. Use HTTPS or localhost.");
-    }
-
-    shareStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-            width: { ideal: VIDEO_SEND_PROFILE.width, max: VIDEO_SEND_PROFILE.width },
-            height: { ideal: VIDEO_SEND_PROFILE.height, max: VIDEO_SEND_PROFILE.height },
-            frameRate: { ideal: VIDEO_SEND_PROFILE.fps, max: VIDEO_SEND_PROFILE.fps },
-            facingMode: "user"
-        }
-    });
-
-    if (!shareStream.getVideoTracks().some(t => t.readyState === "live")) {
-        throw new Error("Camera produced no live video track.");
-    }
-
-    return shareStream;
-}
-
-async function applyBitrateCap(call) {
-    const apply = async () => {
-        try {
-            const pc = call?.peerConnection;
-            if (!pc) return false;
-
-            const senders = pc.getSenders().filter(
-                s => s.track && s.track.kind === "video"
-            );
-
-            for (const sender of senders) {
-                const params = sender.getParameters();
-                if (!params.encodings || !params.encodings.length) {
-                    params.encodings = [{}];
-                }
-                params.encodings[0].maxBitrate = VIDEO_SEND_PROFILE.maxBitrate;
-                params.encodings[0].maxFramerate = VIDEO_SEND_PROFILE.fps;
-                params.degradationPreference = "bandwidth";
-                await sender.setParameters(params);
-            }
-            return senders.length > 0;
-        } catch (e) {
-            console.warn("Could not apply bitrate cap:", e);
-            return false;
-        }
-    };
-
-    setTimeout(apply, 250);
-    setTimeout(apply, 1000);
-    setTimeout(apply, 2500);
-}
-
-function updateCameraButton() {
-    toggleBtn.classList.toggle("active", isCamOn);
-    toggleText.textContent = isCamOn ? "Stop Sharing Camera" : "Share Camera";
-}
-
-function updateMyCameraStatus() {
-    if (socket?.connected) {
-        socket.emit("cam-status", { camOn: isCamOn });
-    }
-    renderMembers();
-}
-
-async function startCameraSharing() {
-    try {
-        await ensureShareStream();
-        isCamOn = true;
-        createVideoTile(myId, userName, true);
-        setTileStream(myId, shareStream);
-        updateCameraButton();
-        updateMyCameraStatus();
-
-        for (const member of remoteMembers.values()) {
-            if (member.peerId) callPeer(member.peerId);
-        }
-
-        setStatus("Camera sharing started (low-data mode: 160×90, 1 fps).");
-    } catch (error) {
-        console.error(error);
-        isCamOn = false;
-        setStatus(error.message || "Could not start camera sharing.", true);
-    }
-}
-
-function stopCameraSharing() {
-    isCamOn = false;
-    if (shareStream) {
-        shareStream.getTracks().forEach(track => track.stop());
-        shareStream = null;
-    }
-    outgoingCalls.forEach(call => { try { call.close(); } catch {} });
-    outgoingCalls.clear();
-    setTileStream(myId, null);
-    updateCameraButton();
-    updateMyCameraStatus();
-    setStatus("Camera sharing stopped.");
-}
-
-toggleBtn.addEventListener("click", async () => {
-    if (!isCamOn) await startCameraSharing();
-    else stopCameraSharing();
-});
-
-/* =========================================
-   PEERJS
-========================================= */
-
-function callPeer(remotePeerId) {
-    if (!peer || !shareStream || !remotePeerId || remotePeerId === myId) return;
-    if (peer.destroyed || peer.disconnected || peer.open === false) return;
-    if (outgoingCalls.has(remotePeerId)) return;
-
-    try {
-        const call = peer.call(remotePeerId, shareStream);
-        if (!call) return;
-        outgoingCalls.set(remotePeerId, call);
-        applyBitrateCap(call);
-
-        call.on("stream", (remoteStream) => {
-            setTileStream(remotePeerId, remoteStream);
-        });
-
-        call.on("close", () => {
-            if (outgoingCalls.get(remotePeerId) === call) {
-                outgoingCalls.delete(remotePeerId);
-            }
-            setTileStream(remotePeerId, null);
-        });
-
-        call.on("error", (error) => {
-            console.warn("Outgoing call error:", error);
-            outgoingCalls.delete(remotePeerId);
-        });
-    } catch (error) {
-        console.warn("Could not call peer:", error);
-    }
-}
-
-function handleIncomingCall(call) {
-    const remotePeerId = call.peer;
-    try {
-        call.answer(shareStream || undefined);
-        incomingCalls.set(remotePeerId, call);
-        applyBitrateCap(call);
-
-        call.on("stream", (stream) => setTileStream(remotePeerId, stream));
-
-        call.on("close", () => {
-            if (incomingCalls.get(remotePeerId) === call) {
-                incomingCalls.delete(remotePeerId);
-            }
-            setTileStream(remotePeerId, null);
-        });
-
-        call.on("error", (error) => {
-            console.warn("Incoming call error:", error);
-        });
-    } catch (error) {
-        console.error("Could not answer call:", error);
-    }
-}
-
-function removePeer(peerId) {
-    const outgoing = outgoingCalls.get(peerId);
-    const incoming = incomingCalls.get(peerId);
-    try { outgoing?.close(); } catch {}
-    try { incoming?.close(); } catch {}
-    outgoingCalls.delete(peerId);
-    incomingCalls.delete(peerId);
-    removeVideoTile(peerId);
-}
-
-/* =========================================
-   SOCKET.IO
-========================================= */
-
-
-/* =========================================
-   SOCKET.IO — FIXED
-========================================= */
-
-function setupSocket() {
-    if (socket) {
-        socket.disconnect();
-        socket = null;
-    }
-
-    socket = io(window.location.origin, {
-        path: "/socket.io/",
-        transports: ["polling", "websocket"],
-        upgrade: true,
-        rememberUpgrade: false,
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 2000,
-        reconnectionDelayMax: 10000,
-        timeout: 20000,
-        forceNew: true
-    });
-
-    socket.on("connect", () => {
-        console.log("[Socket.IO] Connected:", socket.id);
-
-        console.log(
-            "[Socket.IO] Transport:",
-            socket.io.engine.transport.name
-        );
-
-        socket.emit("join", {
-            room: roomName,
-            peerId: myId,
-            userId: userId,
-            name: userName
-        });
-
-        socket.io.engine.on("upgrade", transport => {
-            console.log(
-                "[Socket.IO] Upgraded:",
-                transport.name
-            );
-        });
-    });
-
-    socket.on("connect_error", error => {
-        console.error("[Socket.IO] Connection error:", error);
-
-        setStatus(
-            "Could not connect to the room server.",
-            true
-        );
-    });
-
-    socket.on("disconnect", reason => {
-        console.warn("[Socket.IO] Disconnected:", reason);
-    });
-
-    // =====================================
-    // JOIN ERROR
-    // =====================================
-
-    socket.on("join-error", payload => {
-        setStatus(
-            payload?.message || "Could not join the room.",
-            true
-        );
-    });
-
-    // =====================================
-    // EXISTING MEMBERS
-    // =====================================
-
-    function addRemoteMember(member) {
-        if (!member?.peerId) return;
-        if (member.peerId === myId) return;
-        if (member.userId === userId) return;
-
-        const key = member.userId || member.peerId;
-
-        const previous = remoteMembers.get(key) || {};
-
-        const updated = {
-            ...previous,
-            ...member,
-            userId: key
+        <nav aria-label="Call controls" class="call-dock glass"><button
+                class="control-button camera-button dock-control" id="toggleBtn" title="Toggle webcam" type="button">
+                <svg fill="none" id="camIcon" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                    stroke-width="2" viewbox="0 0 24 24">
+                    <path d="m23 7-7 5 7 5V7z"></path>
+                    <rect height="14" rx="2" width="15" x="1" y="5"></rect>
+                </svg>
+                <span id="toggleText">Share Camera</span>
+            </button><button aria-pressed="false" class="control-button screen-button dock-control" id="screenShareBtn"
+                title="Toggle screen sharing" type="button">
+                <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    viewbox="0 0 24 24">
+                    <rect height="13" rx="2" width="18" x="3" y="4"></rect>
+                    <path d="M8 21h8M12 17v4M10 9l2-2 2 2M12 7v6"></path>
+                </svg>
+                <span id="screenShareBtnText">Share Screen</span>
+            </button><button class="control-button study-button dock-control" id="studyBtn"
+                title="Toggle study session">
+                <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    viewbox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 6v6l4 2"></path>
+                </svg>
+                <span id="studyBtnText">Start Studying</span>
+            </button>
+            <div class="reaction-wrap"><button class="control-button dock-control" id="reactionToggle"
+                    title="Send a reaction" type="button"><i data-lucide="smile-plus"></i><span
+                        class="dock-label">Reaction</span></button>
+                <div class="reaction-menu" id="reactionMenu" role="menu"><button type="button"
+                        data-reaction="Hi"><span>👋</span><span>Hi</span></button><button type="button"
+                        data-reaction="Good morning"><span>🌅</span><span>Good morning</span></button><button
+                        type="button" data-reaction="Bye"><span>🙌</span><span>Bye</span></button><button type="button"
+                        data-reaction="Good night"><span>🌙</span><span>Good night</span></button></div>
+            </div><button class="dock-control leave-control" id="leaveRoomBtn" title="Leave room" type="button"><span
+                    class="dock-symbol">↗</span><span class="dock-label">Leave</span></button>
+        </nav>
+        <div class="members-backdrop" id="membersBackdrop"></div>
+        <div id="reactionLayer" aria-live="polite"></div>
+    </div>
+    <script type="module">
+
+        /* =========================================
+           LOW-DATA PROFILE — بهینه‌ترین تنظیمات WebRTC
+        ========================================= */
+
+        // حداقل کیفیت ممکن برای دیده شدن چهره‌ها — ۱۶۰×۹۰، ۱ فریم بر ثانیه، سقف ۸ kbps
+        const VIDEO_SEND_PROFILE = {
+            width: 352,
+            height: 288,
+            fps: 6,
+            maxBitrate: 100000       // bits/second — camera bandwidth cap
         };
 
-        remoteMembers.set(key, updated);
+        const SCREEN_SEND_PROFILE = {
+            fps: 12,
+            maxBitrate: 700000       // screen text needs more detail than a webcam feed
+        };
 
-        createVideoTile(
-            updated.peerId,
-            updated.name || "Participant"
-        );
+        // فاصله‌ی heartbeat/پروفایل — از ۱۵ ثانیه به ۶۰ ثانیه
+        const PROFILE_SYNC_INTERVAL = 60000;
 
-        // اگر دوربین این کاربر روشن است،
-        // ارتباط تصویری با عضو جدید برقرار شود.
-        if (isCamOn && shareStream) {
-            setTimeout(() => {
-                callPeer(updated.peerId);
-            }, 300);
+        // فاصله‌ی clock tick
+        const CLOCK_TICK_MS = 1000;
+
+        // حداکثر gap قابل قبول (بیشتر از این یعنی sleep/resume — نادیده بگیر)
+        const MAX_TICK_GAP_MS = 5000;
+
+        // تنظیمات کیفیت بصری سمت گیرنده (بدون مصرف اینترنت اضافی)
+        const ENHANCEMENT_ENABLED = true;
+
+        /* =========================================
+           DOM
+        ========================================= */
+
+        const $ = id => document.getElementById(id);
+        if (window.lucide?.createIcons) window.lucide.createIcons({ attrs: { "stroke-width": 2 } });
+
+        const joinScreen = $("joinScreen");
+        const roomScreen = $("roomScreen");
+        const nameInput = $("nameInput");
+        const passwordInput = $("passwordInput");
+        const roomInput = "CSWFR";
+        const joinBtn = $("joinBtn");
+        const errorMsg = $("errorMsg");
+        const videoGrid = $("videoGrid");
+        const screenShareGrid = $("screenShareGrid");
+        const screenShareSection = $("screenShareSection");
+        const screenShareBtn = $("screenShareBtn");
+        const screenShareBtnText = $("screenShareBtnText");
+        const memberList = $("memberList");
+        const memberCount = $("memberCount");
+        const toggleBtn = $("toggleBtn");
+        const toggleText = $("toggleText");
+        const studyBtn = $("studyBtn");
+        const studyBtnText = $("studyBtnText");
+        const studyTimer = $("studyTimer");
+        const studyIndicator = $("studyIndicator");
+        const studyStateText = $("studyStateText");
+        const presenceText = $("presenceText");
+        const leaderboardList = $("leaderboardList");
+        const podium = $("podium");
+        const statusMsg = $("statusMsg");
+
+        /* =========================================
+           STATE
+        ========================================= */
+
+        let peer = null;
+        let socket = null;
+
+        let myId = "";
+        let userId = "";
+        let userName = "";
+        let roomName = "";
+
+        let shareStream = null;
+        let screenStream = null;
+        let isScreenSharing = false;
+        let isCamOn = false;
+        let isStudying = false;
+
+        let lastSaveTime = 0;
+
+        // Study clock — کاملاً مستقل، مقاوم به مینیمایز
+        let studyClockInterval = null;
+        let lastTickTime = 0;
+        let pendingSeconds = 0;
+
+        let selectedPeriod = "today";
+
+        const outgoingCalls = new Map();
+        const incomingCalls = new Map();
+        const outgoingScreenCalls = new Map();
+        const incomingScreenCalls = new Map();
+        const remoteMembers = new Map();
+        const remoteProfiles = new Map();
+
+        // canvas enhancement — peerId → { canvas, ctx, raf, source }
+        const enhancementMap = new Map();
+
+        let ownStats = { version: 1, days: {} };
+
+        const STATS_KEY = "focus_hall_stats_";
+        const REMOTE_KEY = "focus_hall_remote_profiles";
+
+        /* =========================================
+           HELPERS
+        ========================================= */
+
+        function setStatus(message, isError = false) {
+            statusMsg.textContent = message;
+            statusMsg.classList.toggle("error-text", isError);
         }
-    }
 
-    socket.on("others", others => {
-        if (!Array.isArray(others)) return;
+        function formatTime(seconds) {
+            seconds = Math.max(0, Math.floor(seconds || 0));
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            return [
+                String(hours).padStart(2, "0"),
+                String(minutes).padStart(2, "0"),
+                String(secs).padStart(2, "0")
+            ].join(":");
+        }
 
-        others.forEach(addRemoteMember);
+        function tehranDate(date = new Date()) {
+            const parts = new Intl.DateTimeFormat("en-GB", {
+                timeZone: "Asia/Tehran",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            }).formatToParts(date);
+            const get = type => parts.find(p => p.type === type)?.value;
+            return `${get("year")}-${get("month")}-${get("day")}`;
+        }
 
-        renderMembers();
-        renderLeaderboard();
+        function shiftDate(dateString, amount) {
+            const date = new Date(`${dateString}T00:00:00Z`);
+            date.setUTCDate(date.getUTCDate() + amount);
+            return date.toISOString().slice(0, 10);
+        }
 
-        console.log(
-            "[Room] Existing members:",
-            remoteMembers.size
-        );
-    });
+        function getWeekDates() {
+            const today = tehranDate();
+            const date = new Date(`${today}T00:00:00Z`);
+            const weekday = date.getUTCDay();
+            const daysSinceMonday = (weekday + 6) % 7;
+            const monday = shiftDate(today, -daysSinceMonday);
+            const result = [];
+            for (let i = 0; i <= daysSinceMonday; i++) {
+                result.push(shiftDate(monday, i));
+            }
+            return result;
+        }
 
-    // =====================================
-    // NEW MEMBER
-    // =====================================
+        function getPeriodSeconds(days, period) {
+            if (!days || typeof days !== "object") return 0;
+            if (period === "today") return Number(days[tehranDate()] || 0);
+            if (period === "yesterday") return Number(days[shiftDate(tehranDate(), -1)] || 0);
+            if (period === "week") {
+                return getWeekDates().reduce((sum, date) => sum + Number(days[date] || 0), 0);
+            }
+            return Object.values(days).reduce((sum, value) => sum + Number(value || 0), 0);
+        }
 
-    socket.on("peer-joined", member => {
-        addRemoteMember(member);
+        async function hashPassword(password) {
+            const data = new TextEncoder().encode(password);
+            const digest = await crypto.subtle.digest("SHA-256", data);
+            return Array.from(new Uint8Array(digest))
+                .map(byte => byte.toString(16).padStart(2, "0"))
+                .join("");
+        }
 
-        renderMembers();
-        renderLeaderboard();
+        function loadOwnStats() {
+            try {
+                const raw = localStorage.getItem(STATS_KEY + userId);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && parsed.days && typeof parsed.days === "object") {
+                        ownStats = { version: 1, days: parsed.days };
+                    }
+                }
+            } catch (error) {
+                console.warn("Could not load local study statistics:", error);
+            }
+        }
 
-        console.log(
-            "[Room] New member:",
-            member?.name,
-            member?.peerId
-        );
-    });
+        function saveOwnStats() {
+            try {
+                localStorage.setItem(STATS_KEY + userId, JSON.stringify(ownStats));
+            } catch (error) {
+                console.warn("Could not save study statistics:", error);
+            }
+        }
 
-    // =====================================
-    // MEMBER LIST — AUTHORITATIVE SYNC
-    // =====================================
+        function loadRemoteProfiles() {
+            try {
+                const raw = localStorage.getItem(REMOTE_KEY);
+                const parsed = raw ? JSON.parse(raw) : {};
+                if (parsed && typeof parsed === "object") {
+                    Object.entries(parsed).forEach(([id, profile]) => {
+                        if (id !== userId && profile && profile.data) {
+                            remoteProfiles.set(id, profile);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.warn("Could not load remote profiles:", error);
+            }
+        }
 
-    socket.on("member-list", members => {
-        if (!Array.isArray(members)) return;
+        function saveRemoteProfiles() {
+            try {
+                const data = {};
+                remoteProfiles.forEach((profile, id) => { data[id] = profile; });
+                localStorage.setItem(REMOTE_KEY, JSON.stringify(data));
+            } catch (error) {
+                console.warn("Could not save remote profiles:", error);
+            }
+        }
 
-        const activeIds = new Set();
+        function mergeDays(oldDays, newDays) {
+            const merged = { ...(oldDays || {}) };
+            for (const [date, seconds] of Object.entries(newDays || {})) {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+                const value = Number(seconds);
+                if (!Number.isFinite(value) || value < 0) continue;
+                merged[date] = Math.max(Number(merged[date] || 0), Math.floor(value));
+            }
+            return merged;
+        }
 
-        members.forEach(member => {
-            if (!member?.userId) return;
-            if (member.userId === userId) return;
+        /* =========================================
+           PROFILE SYNC
+        ========================================= */
 
-            activeIds.add(member.userId);
+        function sendMyProfile() {
+            if (!socket?.connected || !userId) return;
+            socket.emit("study-profile", {
+                data: { version: 1, days: ownStats.days }
+            });
+        }
 
-            const previous = remoteMembers.get(member.userId) || {};
+        function receiveProfile(payload) {
+            if (!payload || !payload.userId || payload.userId === userId) return;
+            if (!payload.data || typeof payload.data !== "object") return;
 
-            const updated = {
-                ...previous,
-                ...member
+            const existing = remoteProfiles.get(payload.userId);
+            const mergedDays = mergeDays(
+                existing?.data?.days || {},
+                payload.data.days || {}
+            );
+
+            remoteProfiles.set(payload.userId, {
+                name: payload.name || existing?.name || "Participant",
+                data: { version: 1, days: mergedDays }
+            });
+
+            saveRemoteProfiles();
+            renderLeaderboard();
+            updateTileStudyTimes();
+        }
+
+        /* =========================================
+           CANVAS ENHANCEMENT (بدون مصرف اینترنت اضافی)
+        ========================================= */
+
+        function startEnhancement(tile, video, peerId) {
+            if (!ENHANCEMENT_ENABLED) return;
+            if (enhancementMap.has(peerId)) return;
+
+            const canvas = document.createElement("canvas");
+            canvas.className = "enhanced-video";
+            tile.appendChild(canvas);
+
+            const ctx = canvas.getContext("2d", { alpha: false });
+            const scratch = document.createElement("canvas");
+            const scratchCtx = scratch.getContext("2d", { willReadFrequently: true });
+
+            const state = { canvas, ctx, scratch, scratchCtx, video, raf: 0, lastDraw: 0 };
+            enhancementMap.set(peerId, state);
+            tile.classList.add("enhanced");
+
+            const render = (now) => {
+                if (!enhancementMap.has(peerId)) return;
+
+                if (video.readyState >= 2 && now - state.lastDraw >= 200) {
+                    state.lastDraw = now;
+
+                    const w = VIDEO_SEND_PROFILE.width;
+                    const h = VIDEO_SEND_PROFILE.height;
+
+                    if (scratch.width !== w) {
+                        scratch.width = w;
+                        scratch.height = h;
+                        canvas.width = w * 2;
+                        canvas.height = h * 2;
+                    }
+
+                    try {
+                        state.scratchCtx.drawImage(video, 0, 0, w, h);
+                        const frame = state.scratchCtx.getImageData(0, 0, w, h);
+                        const src = frame.data;
+                        const dst = new Uint8ClampedArray(src);
+                        const k = [0, -0.15, 0, -0.15, 1.6, -0.15, 0, -0.15, 0];
+
+                        for (let y = 1; y < h - 1; y++) {
+                            for (let x = 1; x < w - 1; x++) {
+                                const i = (y * w + x) * 4;
+                                for (let c = 0; c < 3; c++) {
+                                    let v = 0, kk = 0;
+                                    for (let dy = -1; dy <= 1; dy++) {
+                                        for (let dx = -1; dx <= 1; dx++) {
+                                            const p = ((y + dy) * w + (x + dx)) * 4 + c;
+                                            v += src[p] * k[kk++];
+                                        }
+                                    }
+                                    dst[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
+                                }
+                            }
+                        }
+                        frame.data.set(dst);
+                        state.scratchCtx.putImageData(frame, 0, 0);
+
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = "high";
+                        ctx.drawImage(scratch, 0, 0, canvas.width, canvas.height);
+                    } catch (e) {
+                        stopEnhancement(peerId);
+                        return;
+                    }
+                }
+
+                state.raf = requestAnimationFrame(render);
             };
 
-            remoteMembers.set(member.userId, updated);
+            state.raf = requestAnimationFrame(render);
+        }
 
-            if (updated.peerId) {
+        function stopEnhancement(peerId) {
+            const state = enhancementMap.get(peerId);
+            if (!state) return;
+            if (state.raf) cancelAnimationFrame(state.raf);
+            if (state.canvas) state.canvas.remove();
+            enhancementMap.delete(peerId);
+
+            const tile = document.getElementById(`tile-${peerId}`);
+            if (tile) tile.classList.remove("enhanced");
+        }
+
+        /* =========================================
+           VIDEO TILE
+        ========================================= */
+
+        function createVideoTile(id, name, isMe = false) {
+            let tile = document.getElementById(`tile-${id}`);
+            if (tile) return tile;
+
+            tile = document.createElement("div");
+            tile.className = "video-tile";
+            tile.id = `tile-${id}`;
+
+            const placeholder = document.createElement("div");
+            placeholder.className = "placeholder";
+
+            const avatar = document.createElement("div");
+            avatar.className = "avatar-lg";
+            avatar.textContent = name.charAt(0).toUpperCase() || "?";
+
+            const placeholderText = document.createElement("div");
+            placeholderText.className = "txt";
+            placeholderText.textContent = "Camera is off";
+
+            placeholder.append(avatar, placeholderText);
+
+            const video = document.createElement("video");
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = isMe;
+
+            const nameTag = document.createElement("div");
+            nameTag.className = "name-tag";
+
+            const dot = document.createElement("span");
+            dot.className = "dot";
+            dot.id = `dot-${id}`;
+
+            const nameText = document.createElement("span");
+            nameText.className = "name-text";
+            nameText.textContent = isMe ? `${name} (You)` : name;
+
+            nameTag.append(dot, nameText);
+            tile.append(placeholder, video, nameTag);
+            if (!String(id).startsWith("screen-")) {
+                const mediaKind = document.createElement("div");
+                mediaKind.className = "media-kind";
+                mediaKind.innerHTML = '<i data-lucide="camera"></i><span>WEBCAM</span>';
+                tile.appendChild(mediaKind);
+            }
+
+            const timeWidget = document.createElement("div");
+            timeWidget.className = "tile-study-time";
+            timeWidget.id = `tile-study-time-${id}`;
+            timeWidget.innerHTML = '<span class="tile-study-dot"></span><span class="tile-study-value">00:00:00</span>';
+            tile.appendChild(timeWidget);
+
+            if (isMe) {
+                const youTag = document.createElement("div");
+                youTag.className = "you-tag";
+                youTag.textContent = "YOU";
+                tile.appendChild(youTag);
+                tile.classList.add("mirror");
+            }
+
+            videoGrid.appendChild(tile);
+            updateTileStudyTimes();
+            return tile;
+        }
+
+        function updateTileStudyTimes() {
+            const ownToday = getPeriodSeconds(ownStats.days, "today");
+            const ownWidget = document.getElementById(`tile-study-time-${myId}`);
+            if (ownWidget) {
+                ownWidget.querySelector(".tile-study-value").textContent = formatTime(ownToday);
+                ownWidget.classList.toggle("is-studying", isStudying);
+            }
+
+            remoteMembers.forEach(member => {
+                const tilePeerId = member.peerId;
+                if (!tilePeerId) return;
+                const widget = document.getElementById(`tile-study-time-${tilePeerId}`);
+                if (!widget) return;
+                const profile = remoteProfiles.get(member.userId);
+                const seconds = getPeriodSeconds(profile?.data?.days || {}, "today");
+                widget.querySelector(".tile-study-value").textContent = formatTime(seconds);
+                widget.classList.toggle("is-studying", Boolean(member.studying));
+            });
+        }
+
+        function createScreenTile(peerId, name, isMe = false) {
+            const tileId = `screen-${peerId}`;
+            let tile = document.getElementById(`tile-${tileId}`);
+            if (tile) return tile;
+            tile = createVideoTile(tileId, name, false);
+            tile.classList.add("screen-share-tile");
+            videoGrid.appendChild(tile);
+            const placeholder = tile.querySelector(".placeholder .txt");
+            if (placeholder) placeholder.textContent = "Waiting for screen...";
+            const video = tile.querySelector("video");
+            video.muted = true;
+            const tag = document.createElement("div");
+            tag.className = "media-kind";
+            tag.innerHTML = '<i data-lucide="monitor-up"></i><span>SCREEN SHARE</span>';
+            tile.appendChild(tag);
+            if (window.lucide?.createIcons) window.lucide.createIcons({ attrs: { "stroke-width": 2 } });
+            return tile;
+        }
+
+        function removeScreenTile(peerId) {
+            const tileId = `screen-${peerId}`;
+            stopEnhancement(tileId);
+            const tile = document.getElementById(`tile-${tileId}`);
+            if (tile) tile.remove();
+            if (!screenShareGrid.children.length) screenShareSection.classList.remove("active");
+        }
+
+        function updateScreenShareButton() {
+            screenShareBtn.classList.toggle("active", isScreenSharing);
+            screenShareBtnText.textContent = isScreenSharing ? "Stop Sharing" : "Share Screen";
+            screenShareBtn.setAttribute("aria-pressed", String(isScreenSharing));
+        }
+
+        function setTileStream(id, stream) {
+            const tile = document.getElementById(`tile-${id}`);
+            if (!tile) return;
+
+            const video = tile.querySelector("video");
+
+            if (!stream) {
+                stopEnhancement(id);
+                video.srcObject = null;
+                tile.classList.remove("has-video");
+                return;
+            }
+
+            const hasLiveVideo = stream.getVideoTracks().some(t => t.readyState === "live");
+            if (!hasLiveVideo) {
+                stopEnhancement(id);
+                video.srcObject = null;
+                tile.classList.remove("has-video");
+                return;
+            }
+
+            video.srcObject = stream;
+            video.play().catch(() => { });
+            tile.classList.add("has-video");
+
+            const isLocal = (id === myId || String(id).startsWith("screen-"));
+            if (!isLocal) {
+                startEnhancement(tile, video, id);
+            }
+        }
+
+        function removeVideoTile(id) {
+            stopEnhancement(id);
+            const tile = document.getElementById(`tile-${id}`);
+            if (tile) tile.remove();
+        }
+
+        /* =========================================
+           MEMBER LIST
+        ========================================= */
+
+        function renderMembers() {
+            const members = [];
+            members.push({
+                peerId: myId,
+                userId,
+                name: userName,
+                camOn: isCamOn,
+                studying: isStudying,
+                me: true
+            });
+
+            remoteMembers.forEach(member => {
+                members.push({ ...member, me: false });
+            });
+
+            memberCount.textContent = String(members.length);
+            memberList.replaceChildren();
+
+            members.forEach(member => {
+                const item = document.createElement("div");
+                item.className = "member-item" + (member.me ? " me" : "");
+
+                const avatar = document.createElement("div");
+                avatar.className = "member-avatar";
+                avatar.textContent = (member.name || "?").charAt(0).toUpperCase();
+
+                const name = document.createElement("div");
+                name.className = "member-name";
+                name.textContent = member.name || "Participant";
+
+                if (member.me) {
+                    const you = document.createElement("span");
+                    you.className = "you-label";
+                    you.textContent = " YOU";
+                    name.appendChild(you);
+                }
+
+                const status = document.createElement("span");
+                status.className = "member-status" + (member.camOn ? " cam-on" : "");
+
+                item.append(avatar, name);
+
+                if (member.studying) {
+                    const study = document.createElement("span");
+                    study.className = "member-study";
+                    study.textContent = "STUDY";
+                    item.appendChild(study);
+                }
+
+                item.appendChild(status);
+                memberList.appendChild(item);
+            });
+        }
+
+        /* =========================================
+           LEADERBOARD
+        ========================================= */
+
+        function renderLeaderboard() {
+            const participants = [];
+            participants.push({ id: userId, name: userName, days: ownStats.days });
+
+            remoteProfiles.forEach((profile, id) => {
+                const member = remoteMembers.get(id);
+                participants.push({
+                    id,
+                    name: member?.name || profile.name || "Participant",
+                    days: profile.data?.days || {}
+                });
+            });
+
+            const ranked = participants
+                .map(person => ({
+                    ...person,
+                    seconds: getPeriodSeconds(person.days, selectedPeriod)
+                }))
+                .sort((a, b) => b.seconds - a.seconds);
+
+            podium.replaceChildren();
+            leaderboardList.replaceChildren();
+
+            if (!ranked.length || ranked.every(person => person.seconds === 0)) {
+                const empty = document.createElement("div");
+                empty.className = "empty-leaderboard";
+                empty.textContent = "No study time recorded for this period yet.";
+                podium.appendChild(empty);
+                return;
+            }
+
+            const topThree = ranked.slice(0, 3);
+            const podiumOrder = topThree.length === 3
+                ? [topThree[1], topThree[0], topThree[2]]
+                : topThree;
+
+            podiumOrder.forEach(person => {
+                const rank = ranked.indexOf(person) + 1;
+                const card = document.createElement("article");
+                card.className = `podium-card podium-${rank}`;
+
+                const crown = document.createElement("div");
+                crown.className = "podium-crown";
+                crown.textContent = rank === 1 ? "♛" : rank === 2 ? "✦" : "✧";
+
+                const avatar = document.createElement("div");
+                avatar.className = "podium-avatar";
+                avatar.textContent = (person.name || "?").trim().charAt(0).toUpperCase();
+
+                const name = document.createElement("div");
+                name.className = "podium-name";
+                name.textContent = person.name || "Participant";
+
+                const time = document.createElement("div");
+                time.className = "podium-time";
+                time.textContent = formatTime(person.seconds);
+
+                const rankLabel = document.createElement("div");
+                rankLabel.className = "podium-rank";
+                rankLabel.textContent = rank === 1 ? "1ST PLACE" : rank === 2 ? "2ND PLACE" : "3RD PLACE";
+
+                const stand = document.createElement("div");
+                stand.className = "podium-stand";
+                stand.textContent = String(rank);
+
+                card.append(crown, avatar, name, time, rankLabel, stand);
+                podium.appendChild(card);
+            });
+
+            ranked.slice(3).forEach((person, index) => {
+                const row = document.createElement("div");
+                row.className = "leaderboard-item";
+
+                const rank = document.createElement("div");
+                rank.className = "leaderboard-rank";
+                rank.textContent = String(index + 4);
+
+                const name = document.createElement("div");
+                name.className = "leaderboard-name";
+                name.textContent = person.name;
+
+                const time = document.createElement("div");
+                time.className = "leaderboard-time";
+                time.textContent = formatTime(person.seconds);
+
+                row.append(rank, name, time);
+                leaderboardList.appendChild(row);
+            });
+        }
+
+        document.querySelectorAll(".period-tab").forEach(button => {
+            button.addEventListener("click", () => {
+                document.querySelectorAll(".period-tab").forEach(item => {
+                    item.classList.remove("active");
+                });
+                button.classList.add("active");
+                selectedPeriod = button.dataset.period;
+                renderLeaderboard();
+            });
+        });
+
+        /* =========================================
+           ROOM / LEADERBOARD VIEW SWITCHING
+        ========================================= */
+
+        function setMainView(target) {
+            const roomView = $("roomTabPanel");
+            const rankingView = $("rankingTabPanel");
+            roomView.classList.toggle("active", target === "room");
+            rankingView.classList.toggle("active", target === "ranking");
+            document.querySelectorAll(".view-tab").forEach(button => {
+                const active = button.dataset.view === target;
+                button.classList.toggle("active", active);
+                button.setAttribute("aria-selected", String(active));
+            });
+            if (target === "ranking") renderLeaderboard();
+            closeMembersDrawer();
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+
+        document.querySelectorAll(".view-tab").forEach(button => {
+            button.addEventListener("click", () => setMainView(button.dataset.view));
+        });
+
+        function closeMembersDrawer() {
+            $("membersPanel")?.classList.remove("drawer-open");
+            $("membersBackdrop")?.classList.remove("visible");
+            $("membersToggle")?.setAttribute("aria-expanded", "false");
+        }
+        $("membersToggle")?.addEventListener("click", () => {
+            const panel = $("membersPanel");
+            const opening = !panel.classList.contains("drawer-open");
+            panel.classList.toggle("drawer-open", opening);
+            $("membersBackdrop").classList.toggle("visible", opening);
+            $("membersToggle").setAttribute("aria-expanded", String(opening));
+        });
+        $("membersBackdrop")?.addEventListener("click", closeMembersDrawer);
+
+        $("leaveRoomBtn")?.addEventListener("click", async () => {
+            if (!confirm("Leave this study room?")) return;
+            try {
+                if (isStudying) await stopStudy();
+                if (isScreenSharing) stopScreenSharing();
+                if (isCamOn) stopCameraSharing();
+                saveOwnStats();
+                if (socket) socket.disconnect();
+                if (peer && !peer.destroyed) peer.destroy();
+            } catch (error) { console.warn("Leave room cleanup:", error); }
+            window.location.reload();
+        });
+
+        /* =========================================
+           CAMERA SHARING — very low bitrate
+        ========================================= */
+
+        async function ensureShareStream() {
+            if (shareStream && shareStream.getVideoTracks().some(t => t.readyState === "live")) {
+                return shareStream;
+            }
+
+            if (!navigator.mediaDevices?.getUserMedia) {
+                throw new Error("Camera access is unavailable. Use HTTPS or localhost.");
+            }
+
+            shareStream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                    width: { ideal: VIDEO_SEND_PROFILE.width, max: VIDEO_SEND_PROFILE.width },
+                    height: { ideal: VIDEO_SEND_PROFILE.height, max: VIDEO_SEND_PROFILE.height },
+                    frameRate: { ideal: VIDEO_SEND_PROFILE.fps, max: VIDEO_SEND_PROFILE.fps },
+                    facingMode: "user"
+                }
+            });
+
+            if (!shareStream.getVideoTracks().some(t => t.readyState === "live")) {
+                throw new Error("Camera produced no live video track.");
+            }
+
+            return shareStream;
+        }
+
+        async function applyBitrateCap(call, profile = VIDEO_SEND_PROFILE) {
+            const apply = async () => {
+                try {
+                    const pc = call?.peerConnection;
+                    if (!pc) return false;
+
+                    const senders = pc.getSenders().filter(
+                        s => s.track && s.track.kind === "video"
+                    );
+
+                    for (const sender of senders) {
+                        const params = sender.getParameters();
+                        if (!params.encodings || !params.encodings.length) {
+                            params.encodings = [{}];
+                        }
+                        params.encodings[0].maxBitrate = profile.maxBitrate;
+                        params.encodings[0].maxFramerate = profile.fps;
+                        params.degradationPreference = "bandwidth";
+                        await sender.setParameters(params);
+                    }
+                    return senders.length > 0;
+                } catch (e) {
+                    console.warn("Could not apply bitrate cap:", e);
+                    return false;
+                }
+            };
+
+            setTimeout(apply, 250);
+            setTimeout(apply, 1000);
+            setTimeout(apply, 2500);
+        }
+
+        function updateCameraButton() {
+            toggleBtn.classList.toggle("active", isCamOn);
+            toggleText.textContent = isCamOn ? "Stop Sharing Camera" : "Share Camera";
+        }
+
+        function updateMyCameraStatus() {
+            if (socket?.connected) {
+                socket.emit("cam-status", { camOn: isCamOn });
+            }
+            renderMembers();
+        }
+
+        async function startCameraSharing() {
+            try {
+                await ensureShareStream();
+                isCamOn = true;
+                createVideoTile(myId, userName, true);
+                setTileStream(myId, shareStream);
+                updateCameraButton();
+                updateMyCameraStatus();
+
+                for (const member of remoteMembers.values()) {
+                    if (member.peerId) callPeer(member.peerId);
+                }
+
+                setStatus("Camera sharing started (low-data mode: 160×90, 1 fps).");
+            } catch (error) {
+                console.error(error);
+                isCamOn = false;
+                setStatus(error.message || "Could not start camera sharing.", true);
+            }
+        }
+
+        function stopCameraSharing() {
+            isCamOn = false;
+            if (shareStream) {
+                shareStream.getTracks().forEach(track => track.stop());
+                shareStream = null;
+            }
+            outgoingCalls.forEach(call => { try { call.close(); } catch { } });
+            outgoingCalls.clear();
+            setTileStream(myId, null);
+            updateCameraButton();
+            updateMyCameraStatus();
+            setStatus("Camera sharing stopped.");
+        }
+
+        toggleBtn.addEventListener("click", async () => {
+            if (!isCamOn) await startCameraSharing();
+            else stopCameraSharing();
+        });
+
+        /* =========================================
+           SCREEN SHARING — PeerJS media stream
+        ========================================= */
+
+        async function startScreenSharing() {
+            if (!navigator.mediaDevices?.getDisplayMedia) {
+                setStatus("Screen sharing is unavailable. Use a supported browser over HTTPS.", true);
+                return;
+            }
+            screenShareBtn.disabled = true;
+            try {
+                screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { frameRate: { ideal: 12, max: 15 } },
+                    audio: false
+                });
+                const track = screenStream.getVideoTracks()[0];
+                if (!track) throw new Error("No screen video track was provided.");
+                isScreenSharing = true;
+                createScreenTile(myId, userName, true);
+                setTileStream(`screen-${myId}`, screenStream);
+                updateScreenShareButton();
+                for (const member of remoteMembers.values()) {
+                    if (member.peerId) callScreenPeer(member.peerId);
+                }
+                track.addEventListener("ended", stopScreenSharing, { once: true });
+                setStatus("Your screen is now being shared with the room.");
+            } catch (error) {
+                if (error?.name === "NotAllowedError") {
+                    setStatus("Screen sharing was cancelled.");
+                } else {
+                    console.error("Screen share error:", error);
+                    setStatus(error.message || "Could not start screen sharing.", true);
+                }
+                if (screenStream) screenStream.getTracks().forEach(track => track.stop());
+                screenStream = null;
+                isScreenSharing = false;
+                updateScreenShareButton();
+            } finally {
+                screenShareBtn.disabled = false;
+            }
+        }
+
+        function stopScreenSharing() {
+            if (screenStream) {
+                screenStream.getTracks().forEach(track => {
+                    track.onended = null;
+                    try { track.stop(); } catch { }
+                });
+            }
+            screenStream = null;
+            isScreenSharing = false;
+            outgoingScreenCalls.forEach(call => { try { call.close(); } catch { } });
+            outgoingScreenCalls.clear();
+            removeScreenTile(myId);
+            updateScreenShareButton();
+            setStatus("Screen sharing stopped.");
+        }
+
+        screenShareBtn.addEventListener("click", () => {
+            if (isScreenSharing) stopScreenSharing();
+            else startScreenSharing();
+        });
+
+        /* =========================================
+           PEERJS
+        ========================================= */
+
+        function callPeer(remotePeerId) {
+            if (!peer || !shareStream || !remotePeerId || remotePeerId === myId) return;
+            if (peer.destroyed || peer.disconnected || peer.open === false) return;
+            if (outgoingCalls.has(remotePeerId)) return;
+
+            try {
+                const call = peer.call(remotePeerId, shareStream);
+                if (!call) return;
+                outgoingCalls.set(remotePeerId, call);
+                applyBitrateCap(call);
+
+                call.on("stream", (remoteStream) => {
+                    setTileStream(remotePeerId, remoteStream);
+                });
+
+                call.on("close", () => {
+                    if (outgoingCalls.get(remotePeerId) === call) {
+                        outgoingCalls.delete(remotePeerId);
+                    }
+                    setTileStream(remotePeerId, null);
+                });
+
+                call.on("error", (error) => {
+                    console.warn("Outgoing call error:", error);
+                    outgoingCalls.delete(remotePeerId);
+                });
+            } catch (error) {
+                console.warn("Could not call peer:", error);
+            }
+        }
+
+        function callScreenPeer(remotePeerId) {
+            if (!peer || !screenStream || !remotePeerId || remotePeerId === myId) return;
+            if (peer.destroyed || peer.disconnected || peer.open === false) return;
+            if (outgoingScreenCalls.has(remotePeerId)) return;
+            try {
+                const call = peer.call(remotePeerId, screenStream, { metadata: { mediaType: "screen" } });
+                if (!call) return;
+                outgoingScreenCalls.set(remotePeerId, call);
+                applyBitrateCap(call, SCREEN_SEND_PROFILE);
+                call.on("stream", () => { });
+                call.on("close", () => {
+                    if (outgoingScreenCalls.get(remotePeerId) === call) outgoingScreenCalls.delete(remotePeerId);
+                });
+                call.on("error", error => {
+                    console.warn("Screen-share call error:", error);
+                    outgoingScreenCalls.delete(remotePeerId);
+                });
+            } catch (error) {
+                console.warn("Could not share screen with peer:", error);
+            }
+        }
+
+        function handleIncomingCall(call) {
+            const remotePeerId = call.peer;
+            const isScreenCall = call.metadata?.mediaType === "screen";
+            try {
+                call.answer(isScreenCall ? undefined : (shareStream || undefined));
+                const targetMap = isScreenCall ? incomingScreenCalls : incomingCalls;
+                targetMap.set(remotePeerId, call);
+                applyBitrateCap(call);
+
+                call.on("stream", stream => {
+                    if (isScreenCall) {
+                        const member = [...remoteMembers.values()].find(item => item.peerId === remotePeerId);
+                        createScreenTile(remotePeerId, member?.name || "Participant");
+                        setTileStream(`screen-${remotePeerId}`, stream);
+                    } else {
+                        setTileStream(remotePeerId, stream);
+                    }
+                });
+
+                call.on("close", () => {
+                    if (targetMap.get(remotePeerId) === call) targetMap.delete(remotePeerId);
+                    if (isScreenCall) removeScreenTile(remotePeerId);
+                    else setTileStream(remotePeerId, null);
+                });
+                call.on("error", error => console.warn("Incoming media call error:", error));
+            } catch (error) {
+                console.error("Could not answer incoming call:", error);
+            }
+        }
+
+        function removePeer(peerId) {
+            const outgoing = outgoingCalls.get(peerId);
+            const incoming = incomingCalls.get(peerId);
+            const outgoingScreen = outgoingScreenCalls.get(peerId);
+            const incomingScreen = incomingScreenCalls.get(peerId);
+            try { outgoing?.close(); } catch { }
+            try { incoming?.close(); } catch { }
+            try { outgoingScreen?.close(); } catch { }
+            try { incomingScreen?.close(); } catch { }
+            outgoingCalls.delete(peerId);
+            incomingCalls.delete(peerId);
+            outgoingScreenCalls.delete(peerId);
+            incomingScreenCalls.delete(peerId);
+            removeVideoTile(peerId);
+            removeScreenTile(peerId);
+        }
+
+        /* =========================================
+           SOCKET.IO
+        ========================================= */
+
+
+        /* =========================================
+           SOCKET.IO — FIXED
+        ========================================= */
+
+        function setupSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+
+            socket = io(window.location.origin, {
+                path: "/socket.io/",
+                transports: ["polling", "websocket"],
+                upgrade: true,
+                rememberUpgrade: false,
+                reconnection: true,
+                reconnectionAttempts: Infinity,
+                reconnectionDelay: 2000,
+                reconnectionDelayMax: 10000,
+                timeout: 20000,
+                forceNew: true
+            });
+
+            socket.on("room-reaction", payload => {
+                if (payload?.userId === userId) return;
+                showRoomReaction(payload);
+            });
+
+            socket.on("connect", () => {
+                console.log("[Socket.IO] Connected:", socket.id);
+
+                console.log(
+                    "[Socket.IO] Transport:",
+                    socket.io.engine.transport.name
+                );
+
+                socket.emit("join", {
+                    room: roomName,
+                    peerId: myId,
+                    userId: userId,
+                    name: userName
+                });
+
+                socket.io.engine.on("upgrade", transport => {
+                    console.log(
+                        "[Socket.IO] Upgraded:",
+                        transport.name
+                    );
+                });
+            });
+
+            socket.on("connect_error", error => {
+                console.error("[Socket.IO] Connection error:", error);
+
+                setStatus(
+                    "Could not connect to the room server.",
+                    true
+                );
+            });
+
+            socket.on("disconnect", reason => {
+                console.warn("[Socket.IO] Disconnected:", reason);
+            });
+
+            // =====================================
+            // JOIN ERROR
+            // =====================================
+
+            socket.on("join-error", payload => {
+                setStatus(
+                    payload?.message || "Could not join the room.",
+                    true
+                );
+            });
+
+            // =====================================
+            // EXISTING MEMBERS
+            // =====================================
+
+            function addRemoteMember(member) {
+                if (!member?.peerId) return;
+                if (member.peerId === myId) return;
+                if (member.userId === userId) return;
+
+                const key = member.userId || member.peerId;
+
+                const previous = remoteMembers.get(key) || {};
+
+                const updated = {
+                    ...previous,
+                    ...member,
+                    userId: key
+                };
+
+                remoteMembers.set(key, updated);
+
                 createVideoTile(
                     updated.peerId,
                     updated.name || "Participant"
                 );
 
+                // اگر دوربین این کاربر روشن است،
+                // ارتباط تصویری با عضو جدید برقرار شود.
                 if (isCamOn && shareStream) {
-                    callPeer(updated.peerId);
+                    setTimeout(() => callPeer(updated.peerId), 300);
+                }
+                if (isScreenSharing && screenStream) {
+                    setTimeout(() => callScreenPeer(updated.peerId), 450);
                 }
             }
-        });
 
-        // حذف اعضایی که دیگر در اتاق نیستند
-        for (const [id, member] of remoteMembers.entries()) {
-            if (!activeIds.has(id)) {
+            socket.on("others", others => {
+                if (!Array.isArray(others)) return;
+
+                others.forEach(addRemoteMember);
+
+                renderMembers();
+                renderLeaderboard();
+
+                console.log(
+                    "[Room] Existing members:",
+                    remoteMembers.size
+                );
+            });
+
+            // =====================================
+            // NEW MEMBER
+            // =====================================
+
+            socket.on("peer-joined", member => {
+                addRemoteMember(member);
+
+                renderMembers();
+                renderLeaderboard();
+
+                console.log(
+                    "[Room] New member:",
+                    member?.name,
+                    member?.peerId
+                );
+            });
+
+            // =====================================
+            // MEMBER LIST — AUTHORITATIVE SYNC
+            // =====================================
+
+            socket.on("member-list", members => {
+                if (!Array.isArray(members)) return;
+
+                const activeIds = new Set();
+
+                members.forEach(member => {
+                    if (!member?.userId) return;
+                    if (member.userId === userId) return;
+
+                    activeIds.add(member.userId);
+
+                    const previous = remoteMembers.get(member.userId) || {};
+
+                    const updated = {
+                        ...previous,
+                        ...member
+                    };
+
+                    remoteMembers.set(member.userId, updated);
+
+                    if (updated.peerId) {
+                        createVideoTile(
+                            updated.peerId,
+                            updated.name || "Participant"
+                        );
+
+                        if (isCamOn && shareStream) callPeer(updated.peerId);
+                        if (isScreenSharing && screenStream) callScreenPeer(updated.peerId);
+                    }
+                });
+
+                // حذف اعضایی که دیگر در اتاق نیستند
+                for (const [id, member] of remoteMembers.entries()) {
+                    if (!activeIds.has(id)) {
+                        if (member.peerId) {
+                            removePeer(member.peerId);
+                        }
+
+                        remoteMembers.delete(id);
+                    }
+                }
+
+                renderMembers();
+                renderLeaderboard();
+
+                console.log(
+                    "[Room] Member list synchronized:",
+                    members.length
+                );
+            });
+
+            // =====================================
+            // MEMBER LEFT
+            // =====================================
+
+            socket.on("peer-left", member => {
+                if (!member) return;
+
+                console.log(
+                    "[Room] Member left:",
+                    member.peerId
+                );
+
                 if (member.peerId) {
                     removePeer(member.peerId);
                 }
 
-                remoteMembers.delete(id);
-            }
-        }
-
-        renderMembers();
-        renderLeaderboard();
-
-        console.log(
-            "[Room] Member list synchronized:",
-            members.length
-        );
-    });
-
-    // =====================================
-    // MEMBER LEFT
-    // =====================================
-
-    socket.on("peer-left", member => {
-        if (!member) return;
-
-        console.log(
-            "[Room] Member left:",
-            member.peerId
-        );
-
-        if (member.peerId) {
-            removePeer(member.peerId);
-        }
-
-        if (member.userId) {
-            remoteMembers.delete(member.userId);
-        }
-
-        renderMembers();
-        renderLeaderboard();
-    });
-
-    // =====================================
-    // CAMERA STATUS
-    // =====================================
-
-    socket.on("peer-cam-status", payload => {
-        if (!payload?.peerId) return;
-
-        const member = [...remoteMembers.values()]
-            .find(item => item.peerId === payload.peerId);
-
-        if (member) {
-            member.camOn = payload.camOn === true;
-        }
-
-        const dot = document.getElementById(
-            `dot-${payload.peerId}`
-        );
-
-        if (dot) {
-            dot.classList.toggle(
-                "on",
-                payload.camOn === true
-            );
-        }
-
-        renderMembers();
-    });
-
-    // =====================================
-    // STUDY STATUS
-    // =====================================
-
-    socket.on("peer-study-status", payload => {
-        if (!payload?.userId) return;
-
-        const member = remoteMembers.get(payload.userId);
-
-        if (member) {
-            member.studying = payload.studying === true;
-        }
-
-        renderMembers();
-    });
-
-    // =====================================
-    // STUDY PROFILE
-    // =====================================
-
-    socket.on("study-profile-request", () => {
-        sendMyProfile();
-    });
-
-    socket.on("study-profile", payload => {
-        receiveProfile(payload);
-    });
-
-    console.log("[Socket.IO] Event listeners initialized.");
-}
-
-/* =========================================
-   STUDY CLOCK — مقاوم به مینیمایز
-========================================= */
-
-function startStudyClock() {
-    stopStudyClock();
-    lastTickTime = Date.now();
-    pendingSeconds = 0;
-
-    studyClockInterval = setInterval(() => {
-        if (!isStudying) {
-            lastTickTime = Date.now();
-            return;
-        }
-
-        const now = Date.now();
-        const delta = now - lastTickTime;
-        lastTickTime = now;
-
-        // اگر gap خیلی بزرگ بود (sleep/resume)، نادیده بگیر
-        if (delta <= 0 || delta > MAX_TICK_GAP_MS) return;
-
-        pendingSeconds += delta;
-
-        // هر ۱۰۰۰ms، ثانیه‌ی کامل را اضافه کن
-        const fullSeconds = Math.floor(pendingSeconds / 1000);
-        if (fullSeconds > 0) {
-            pendingSeconds -= fullSeconds * 1000;
-            addStudySeconds(fullSeconds);
-        }
-    }, CLOCK_TICK_MS);
-}
-
-function stopStudyClock() {
-    if (studyClockInterval) {
-        clearInterval(studyClockInterval);
-        studyClockInterval = null;
-    }
-    pendingSeconds = 0;
-    lastTickTime = 0;
-}
-
-function addStudySeconds(seconds) {
-    if (!Number.isFinite(seconds) || seconds <= 0) return;
-    const today = tehranDate();
-    ownStats.days[today] = Math.floor(
-        Number(ownStats.days[today] || 0) + seconds
-    );
-    const total = getPeriodSeconds(ownStats.days, "all");
-    studyTimer.textContent = formatTime(total);
-    renderLeaderboard();
-}
-
-/* =========================================
-   STUDY SESSION
-========================================= */
-
-function updateStudyUI() {
-    studyBtn.classList.toggle("active", isStudying);
-    studyBtnText.textContent = isStudying ? "Stop Studying" : "Start Studying";
-
-    studyIndicator.classList.toggle("active", isStudying);
-
-    studyStateText.textContent = isStudying
-        ? "Study session active"
-        : "Study session inactive";
-
-    renderMembers();
-}
-
-async function startStudy() {
-    studyBtn.disabled = true;
-    studyBtnText.textContent = "Starting...";
-
-    try {
-        isStudying = true;
-        startStudyClock();
-        updateStudyUI();
-
-        if (socket?.connected) {
-            socket.emit("study-status", { studying: true });
-        }
-
-        presenceText.textContent = "Time is being recorded · You can minimize this tab";
-        setStatus("Study session started. Time is recording.");
-    } catch (error) {
-        console.error(error);
-        isStudying = false;
-        stopStudyClock();
-        studyStateText.textContent = "Could not start study session";
-        presenceText.textContent = error.message || "Unexpected error.";
-        setStatus("Could not start study session.", true);
-    } finally {
-        studyBtn.disabled = false;
-        updateStudyUI();
-    }
-}
-
-async function stopStudy() {
-    isStudying = false;
-    stopStudyClock();
-
-    saveOwnStats();
-    sendMyProfile();
-
-    if (socket?.connected) {
-        socket.emit("study-status", { studying: false });
-    }
-
-    updateStudyUI();
-    presenceText.textContent = "Study session stopped.";
-    setStatus("Your study session has ended.");
-}
-
-studyBtn.addEventListener("click", async () => {
-    if (!isStudying) await startStudy();
-    else await stopStudy();
-});
-
-/* =========================================
-   JOIN
-========================================= */
-
-function validateInputs() {
-    const name = nameInput.value.trim();
-    const password = passwordInput.value;
-    const room = roomInput.value.trim();
-
-    if (!name) { errorMsg.textContent = "Please enter your name."; return false; }
-    if (password.length < 8) { errorMsg.textContent = "Password must contain at least 8 characters."; return false; }
-    if (!room) { errorMsg.textContent = "Please enter a room code."; return false; }
-    if (!/^[a-zA-Z0-9_-]{1,40}$/.test(room)) {
-        errorMsg.textContent = "Room code can only contain letters, numbers, _ and -.";
-        return false;
-    }
-    errorMsg.textContent = "";
-    return true;
-}
-
-joinBtn.addEventListener("click", joinRoom);
-[nameInput, passwordInput, roomInput].forEach(input => {
-    input.addEventListener("keydown", event => {
-        if (event.key === "Enter") joinRoom();
-    });
-});
-
-async function joinRoom() {
-    if (!validateInputs()) return;
-    if (peer && peer.destroyed) peer = null;
-
-    joinBtn.disabled = true;
-    joinBtn.textContent = "Connecting...";
-
-    try {
-        userName = nameInput.value.trim().slice(0, 30);
-        roomName = roomInput.value.trim();
-        userId = await hashPassword(passwordInput.value);
-        passwordInput.value = "";
-
-        loadOwnStats();
-        loadRemoteProfiles();
-
-        peer = new Peer(
-            `conf-${roomName}-${crypto.randomUUID()}`,
-            {
-                host: "conference-production-676141da.up.railway.app",
-                port: 443,
-                secure: true,
-                path: "/peerjs",
-                config: {
-                    iceServers: [
-                        { urls: "stun:stun.l.google.com:19302" },
-                        { urls: "stun:stun1.l.google.com:19302" },
-                        {
-                            urls: "turn:openrelay.metered.ca:80",
-                            username: "openrelayproject",
-                            credential: "openrelayproject"
-                        },
-                        {
-                            urls: "turn:openrelay.metered.ca:443",
-                            username: "openrelayproject",
-                            credential: "openrelayproject"
-                        }
-                    ]
+                if (member.userId) {
+                    remoteMembers.delete(member.userId);
                 }
+
+                renderMembers();
+                renderLeaderboard();
+            });
+
+            // =====================================
+            // CAMERA STATUS
+            // =====================================
+
+            socket.on("peer-cam-status", payload => {
+                if (!payload?.peerId) return;
+
+                const member = [...remoteMembers.values()]
+                    .find(item => item.peerId === payload.peerId);
+
+                if (member) {
+                    member.camOn = payload.camOn === true;
+                }
+
+                const dot = document.getElementById(
+                    `dot-${payload.peerId}`
+                );
+
+                if (dot) {
+                    dot.classList.toggle(
+                        "on",
+                        payload.camOn === true
+                    );
+                }
+
+                renderMembers();
+            });
+
+            // =====================================
+            // STUDY STATUS
+            // =====================================
+
+            socket.on("peer-study-status", payload => {
+                if (!payload?.userId) return;
+
+                const member = remoteMembers.get(payload.userId);
+
+                if (member) {
+                    member.studying = payload.studying === true;
+                }
+
+                renderMembers();
+            });
+
+            // =====================================
+            // STUDY PROFILE
+            // =====================================
+
+            socket.on("study-profile-request", () => {
+                sendMyProfile();
+            });
+
+            socket.on("study-profile", payload => {
+                receiveProfile(payload);
+            });
+
+            console.log("[Socket.IO] Event listeners initialized.");
+        }
+
+        /* =========================================
+           STUDY CLOCK — مقاوم به مینیمایز
+        ========================================= */
+
+        function startStudyClock() {
+            stopStudyClock();
+            lastTickTime = Date.now();
+            pendingSeconds = 0;
+
+            studyClockInterval = setInterval(() => {
+                if (!isStudying) {
+                    lastTickTime = Date.now();
+                    return;
+                }
+
+                const now = Date.now();
+                const delta = now - lastTickTime;
+                lastTickTime = now;
+
+                // اگر gap خیلی بزرگ بود (sleep/resume)، نادیده بگیر
+                if (delta <= 0 || delta > MAX_TICK_GAP_MS) return;
+
+                pendingSeconds += delta;
+
+                // هر ۱۰۰۰ms، ثانیه‌ی کامل را اضافه کن
+                const fullSeconds = Math.floor(pendingSeconds / 1000);
+                if (fullSeconds > 0) {
+                    pendingSeconds -= fullSeconds * 1000;
+                    addStudySeconds(fullSeconds);
+                }
+            }, CLOCK_TICK_MS);
+        }
+
+        function stopStudyClock() {
+            if (studyClockInterval) {
+                clearInterval(studyClockInterval);
+                studyClockInterval = null;
             }
-        );
+            pendingSeconds = 0;
+            lastTickTime = 0;
+        }
 
-        peer.on("open", id => {
-            myId = id;
-            $("roomNameLabel").textContent = roomName;
-            $("userNameLabel").textContent = userName;
-            $("userAvatar").textContent = userName.charAt(0).toUpperCase();
-
-            joinScreen.style.display = "none";
-            roomScreen.classList.add("active");
-
-            createVideoTile(myId, userName, true);
-            studyTimer.textContent = formatTime(getPeriodSeconds(ownStats.days, "all"));
-            renderMembers();
+        function addStudySeconds(seconds) {
+            if (!Number.isFinite(seconds) || seconds <= 0) return;
+            const today = tehranDate();
+            ownStats.days[today] = Math.floor(
+                Number(ownStats.days[today] || 0) + seconds
+            );
+            const total = getPeriodSeconds(ownStats.days, "all");
+            studyTimer.textContent = formatTime(total);
             renderLeaderboard();
-            setupSocket();
-            setStatus("Connected. Welcome to your study room.");
-        });
+            updateTileStudyTimes();
+        }
 
-        peer.on("call", handleIncomingCall);
+        /* =========================================
+           STUDY SESSION
+        ========================================= */
 
-        peer.on("error", error => {
-            console.error("PeerJS error:", error);
-            if (error.type === "peer-unavailable") return;
-            if (error.type === "server-error" || error.type === "network") {
-                setStatus("Peer connection lost. Please refresh.", true);
-                return;
+        function updateStudyUI() {
+            studyBtn.classList.toggle("active", isStudying);
+            studyBtnText.textContent = isStudying ? "Stop Studying" : "Start Studying";
+
+            studyIndicator.classList.toggle("active", isStudying);
+
+            studyStateText.textContent = isStudying
+                ? "Study session active"
+                : "Study session inactive";
+
+            renderMembers();
+            updateTileStudyTimes();
+        }
+
+        async function startStudy() {
+            studyBtn.disabled = true;
+            studyBtnText.textContent = "Starting...";
+
+            try {
+                isStudying = true;
+                startStudyClock();
+                updateStudyUI();
+
+                if (socket?.connected) {
+                    socket.emit("study-status", { studying: true });
+                }
+
+                presenceText.textContent = "Time is being recorded · You can minimize this tab";
+                setStatus("Study session started. Time is recording.");
+            } catch (error) {
+                console.error(error);
+                isStudying = false;
+                stopStudyClock();
+                studyStateText.textContent = "Could not start study session";
+                presenceText.textContent = error.message || "Unexpected error.";
+                setStatus("Could not start study session.", true);
+            } finally {
+                studyBtn.disabled = false;
+                updateStudyUI();
             }
-            setStatus("Peer connection error: " + error.type, true);
+        }
+
+        async function stopStudy() {
+            isStudying = false;
+            stopStudyClock();
+
+            saveOwnStats();
+            sendMyProfile();
+
+            if (socket?.connected) {
+                socket.emit("study-status", { studying: false });
+            }
+
+            updateStudyUI();
+            presenceText.textContent = "Study session stopped.";
+            setStatus("Your study session has ended.");
+        }
+
+        studyBtn.addEventListener("click", async () => {
+            if (!isStudying) await startStudy();
+            else await stopStudy();
         });
 
-    } catch (error) {
-        console.error(error);
-        errorMsg.textContent = error.message || "Could not initialize your account.";
-        joinBtn.disabled = false;
-        joinBtn.textContent = "Join Study Room";
-    }
-}
+        /* =========================================
+           JOIN
+        ========================================= */
 
-/* =========================================
-   VISIBILITY — فقط برای اطلاع‌رسانی
-========================================= */
+        function validateInputs() {
+            const name = nameInput.value.trim();
+            const password = passwordInput.value;
+            const room = roomInput;
 
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "visible" && isStudying) {
-        presenceText.textContent = "Tab hidden — time is still being recorded";
-    } else if (document.visibilityState === "visible" && isStudying) {
-        presenceText.textContent = "Time is being recorded · You can minimize this tab";
-    }
-});
+            if (!name) { errorMsg.textContent = "Please enter your name."; return false; }
+            if (password.length < 8) { errorMsg.textContent = "Password must contain at least 8 characters."; return false; }
+            if (!room) { errorMsg.textContent = "Please enter a room code."; return false; }
+            if (!/^[a-zA-Z0-9_-]{1,40}$/.test(room)) {
+                errorMsg.textContent = "Room code can only contain letters, numbers, _ and -.";
+                return false;
+            }
+            errorMsg.textContent = "";
+            return true;
+        }
 
-/* =========================================
-   PERIODIC SYNC (60s)
-========================================= */
+        joinBtn.addEventListener("click", joinRoom);
+        [nameInput, passwordInput].forEach(input => {
+            input.addEventListener("keydown", event => {
+                if (event.key === "Enter") joinRoom();
+            });
+        });
 
-setInterval(() => {
-    if (!userId) return;
-    saveOwnStats();
-    sendMyProfile();
-}, PROFILE_SYNC_INTERVAL);
 
-setInterval(() => {
-    if (isStudying) saveOwnStats();
-}, 60000);
+        /* =========================================
+           ROOM REACTIONS
+           Requires the small Socket.IO relay handler documented after this file.
+        ========================================= */
+        const reactionCatalog = {
+            "Hi": "👋",
+            "Good morning": "🌅",
+            "Bye": "🙌",
+            "Good night": "🌙"
+        };
+        const reactionToggle = $("reactionToggle");
+        const reactionMenu = $("reactionMenu");
+        const reactionLayer = $("reactionLayer");
 
-/* =========================================
-   CLEANUP
-========================================= */
 
-window.addEventListener("beforeunload", () => {
-    saveOwnStats();
-    stopStudyClock();
-    enhancementMap.forEach((_, id) => stopEnhancement(id));
-    if (isStudying && socket?.connected) {
-        socket.emit("study-status", { studying: false });
-    }
-    if (socket) socket.disconnect();
-    if (shareStream) shareStream.getTracks().forEach(track => track.stop());
-    if (peer && !peer.destroyed) {
-        try { peer.destroy(); } catch {}
-    }
-    peer = null;
-});
-</script>
+        /* =========================================
+           REACTION NOTIFICATION SOUND
+           Web Audio is used so no external sound file is needed.
+           Browsers require a user gesture before audio can play;
+           joining/interacting with the room unlocks the audio context.
+        ========================================= */
+        let reactionAudioContext = null;
 
+        function unlockReactionAudio() {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+
+            try {
+                if (!reactionAudioContext) {
+                    reactionAudioContext = new AudioContextClass();
+                }
+                if (reactionAudioContext.state === "suspended") {
+                    reactionAudioContext.resume().catch(() => { });
+                }
+            } catch (error) {
+                console.warn("[Reaction audio] Could not initialize audio:", error);
+            }
+        }
+
+        function playReactionSound() {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+
+            try {
+                if (!reactionAudioContext) {
+                    reactionAudioContext = new AudioContextClass();
+                }
+
+                if (reactionAudioContext.state === "suspended") {
+                    reactionAudioContext.resume().then(() => playReactionTone()).catch(() => { });
+                    return;
+                }
+
+                playReactionTone();
+            } catch (error) {
+                console.warn("[Reaction audio] Playback unavailable:", error);
+            }
+        }
+
+        function playReactionTone() {
+            if (!reactionAudioContext || reactionAudioContext.state !== "running") return;
+
+            const ctx = reactionAudioContext;
+            const now = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.0001, now);
+            master.gain.exponentialRampToValueAtTime(0.13, now + 0.018);
+            master.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+            master.connect(ctx.destination);
+
+            // Two soft, bright notes create a short notification chime.
+            [659.25, 880].forEach((frequency, index) => {
+                const oscillator = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const start = now + index * 0.105;
+
+                oscillator.type = "sine";
+                oscillator.frequency.setValueAtTime(frequency, start);
+
+                gain.gain.setValueAtTime(0.0001, start);
+                gain.gain.exponentialRampToValueAtTime(0.75, start + 0.018);
+                gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.19);
+
+                oscillator.connect(gain);
+                gain.connect(master);
+                oscillator.start(start);
+                oscillator.stop(start + 0.21);
+            });
+        }
+
+        // Attempt to unlock audio on the first real user interaction in the room.
+        ["pointerdown", "keydown", "touchstart"].forEach(eventName => {
+            window.addEventListener(eventName, unlockReactionAudio, { once: true, passive: true });
+        });
+
+        function showRoomReaction(payload) {
+            if (!payload || !reactionCatalog[payload.message]) return;
+
+            // Each participant hears the same short chime when a reaction appears.
+            playReactionSound();
+
+            const toast = document.createElement("button");
+            toast.type = "button";
+            toast.className = "reaction-toast";
+            const emoji = document.createElement("span");
+            emoji.className = "reaction-emoji";
+            emoji.textContent = reactionCatalog[payload.message];
+            const copy = document.createElement("span");
+            copy.className = "reaction-copy";
+            const strong = document.createElement("strong");
+            strong.textContent = `${payload.name || "Participant"} · ${payload.message}`;
+            const small = document.createElement("small");
+            small.textContent = "Click to dismiss";
+            copy.append(strong, small);
+            const dismiss = document.createElement("span");
+            dismiss.className = "reaction-dismiss";
+            dismiss.textContent = "×";
+            toast.append(emoji, copy, dismiss);
+            toast.addEventListener("click", () => {
+                toast.classList.add("removing");
+                setTimeout(() => toast.remove(), 230);
+            });
+            reactionLayer.appendChild(toast);
+            // Safety cap for unattended notifications.
+            while (reactionLayer.children.length > 5) reactionLayer.firstElementChild.remove();
+        }
+        reactionToggle?.addEventListener("click", event => {
+            unlockReactionAudio();
+            event.stopPropagation();
+            reactionMenu?.classList.toggle("open");
+        });
+        reactionMenu?.querySelectorAll("[data-reaction]").forEach(button => {
+            button.addEventListener("click", () => {
+                const message = button.dataset.reaction;
+                const payload = { message, name: userName, userId, room: roomName, nonce: `${Date.now()}-${Math.random()}` };
+                showRoomReaction(payload);
+                if (socket?.connected) socket.emit("room-reaction", payload);
+                reactionMenu.classList.remove("open");
+            });
+        });
+        document.addEventListener("click", event => {
+            if (!event.target.closest(".reaction-wrap")) reactionMenu?.classList.remove("open");
+        });
+
+
+        async function joinRoom() {
+            if (!validateInputs()) return;
+            if (peer && peer.destroyed) peer = null;
+
+            joinBtn.disabled = true;
+            joinBtn.textContent = "Connecting...";
+
+            try {
+                userName = nameInput.value.trim().slice(0, 30);
+                roomName = roomInput;
+                userId = await hashPassword(passwordInput.value);
+                passwordInput.value = "";
+
+                loadOwnStats();
+                loadRemoteProfiles();
+
+                peer = new Peer(
+                    `conf-${roomName}-${crypto.randomUUID()}`,
+                    {
+                        host: "conference-production-676141da.up.railway.app",
+                        port: 443,
+                        secure: true,
+                        path: "/peerjs",
+                        config: {
+                            iceServers: [
+                                { urls: "stun:stun.l.google.com:19302" },
+                                { urls: "stun:stun1.l.google.com:19302" },
+                                {
+                                    urls: "turn:openrelay.metered.ca:80",
+                                    username: "openrelayproject",
+                                    credential: "openrelayproject"
+                                },
+                                {
+                                    urls: "turn:openrelay.metered.ca:443",
+                                    username: "openrelayproject",
+                                    credential: "openrelayproject"
+                                }
+                            ]
+                        }
+                    }
+                );
+
+                peer.on("open", id => {
+                    myId = id;
+                    $("roomNameLabel").textContent = roomName;
+                    $("userNameLabel").textContent = userName;
+                    $("userAvatar").textContent = userName.charAt(0).toUpperCase();
+
+                    joinScreen.style.display = "none";
+                    roomScreen.classList.add("active");
+
+                    createVideoTile(myId, userName, true);
+                    studyTimer.textContent = formatTime(getPeriodSeconds(ownStats.days, "all"));
+                    renderMembers();
+                    renderLeaderboard();
+                    setupSocket();
+                    setStatus("Connected. Welcome to your study room.");
+                });
+
+                peer.on("call", handleIncomingCall);
+
+                peer.on("error", error => {
+                    console.error("PeerJS error:", error);
+                    if (error.type === "peer-unavailable") return;
+                    if (error.type === "server-error" || error.type === "network") {
+                        setStatus("Peer connection lost. Please refresh.", true);
+                        return;
+                    }
+                    setStatus("Peer connection error: " + error.type, true);
+                });
+
+            } catch (error) {
+                console.error(error);
+                errorMsg.textContent = error.message || "Could not initialize your account.";
+                joinBtn.disabled = false;
+                joinBtn.textContent = "Join Study Room";
+            }
+        }
+
+        /* =========================================
+           VISIBILITY — فقط برای اطلاع‌رسانی
+        ========================================= */
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState !== "visible" && isStudying) {
+                presenceText.textContent = "Tab hidden — time is still being recorded";
+            } else if (document.visibilityState === "visible" && isStudying) {
+                presenceText.textContent = "Time is being recorded · You can minimize this tab";
+            }
+        });
+
+        /* =========================================
+           PERIODIC SYNC (60s)
+        ========================================= */
+
+        setInterval(() => {
+            if (!userId) return;
+            saveOwnStats();
+            sendMyProfile();
+        }, PROFILE_SYNC_INTERVAL);
+
+        setInterval(() => {
+            if (isStudying) saveOwnStats();
+        }, 60000);
+
+        /* =========================================
+           CLEANUP
+        ========================================= */
+
+        window.addEventListener("beforeunload", () => {
+            saveOwnStats();
+            stopStudyClock();
+            enhancementMap.forEach((_, id) => stopEnhancement(id));
+            if (isStudying && socket?.connected) {
+                socket.emit("study-status", { studying: false });
+            }
+            if (socket) socket.disconnect();
+            if (shareStream) shareStream.getTracks().forEach(track => track.stop());
+            if (screenStream) screenStream.getTracks().forEach(track => track.stop());
+            if (peer && !peer.destroyed) {
+                try { peer.destroy(); } catch { }
+            }
+            peer = null;
+        });
+    </script>
 </body>
+
 </html>
