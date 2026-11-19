@@ -878,10 +878,20 @@ button { color: inherit; }
 </div>
 
 <script type="module">
+/*
+ * همه‌چیز محلی:
+ * - vision_bundle.mjs (نزدیک خود فایل HTML یا در /mediapipe/vision_bundle.mjs)
+ * - WASM runtime از /mediapipe/wasm/
+ * - مدل از /mediapipe/face_landmarker.task
+ *
+ * اگر vision_bundle.mjs را محلی گذاشتید، خط import زیر را به:
+ *   import { FilesetResolver, FaceLandmarker } from "/mediapipe/vision_bundle.mjs";
+ * تغییر دهید.
+ */
 import {
     FilesetResolver,
     FaceLandmarker
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
+} from "/mediapipe/vision_bundle.mjs";
 
 /* =========================================
    DOM
@@ -916,6 +926,13 @@ const pipTimerWidget = $("pipTimerWidget");
 const pipTimerText = $("pipTimerText");
 
 /* =========================================
+   LOCAL MEDIA PIPE PATHS
+========================================= */
+
+const MEDIAPIPE_WASM_PATH = "/mediapipe/wasm";
+const FACE_LANDMARKER_MODEL_PATH = "/mediapipe/face_landmarker.task";
+
+/* =========================================
    STATE
 ========================================= */
 
@@ -940,26 +957,24 @@ let detectionBusy = false;
 let lastVideoTime = -1;
 let lastSaveTime = 0;
 
-// Grace period — چهره گم شد ولی هنوز state قبلی را نگه داریم
+// Grace period
 const FACE_LOST_GRACE_MS = 1800;
 let faceLostSince = 0;
 
-// State stability — جلوگیری از نوسان بین focused/distracted
+// State stability
 const STATE_STABILITY_MS = 1500;
 let candidateState = "away";
 let candidateStateSince = 0;
 
-// آخرین confidence برای گزارش
 let latestConfidence = 0;
 
 let selectedPeriod = "today";
 
-// Study clock — مستقل از detection
+// Study clock
 let studyClockInterval = null;
 let lastTickTime = 0;
 let fractionalMs = 0;
 
-// PiP state
 let pipActive = false;
 
 const outgoingCalls = new Map();
@@ -972,7 +987,7 @@ let ownStats = { version: 1, days: {} };
 const STATS_KEY = "focus_hall_stats_";
 const REMOTE_KEY = "focus_hall_remote_profiles";
 const PROFILE_SYNC_INTERVAL = 15000;
-const DETECT_INTERVAL_MS = 400;  // ~2.5 FPS
+const DETECT_INTERVAL_MS = 400;
 const CLOCK_TICK_MS = 1000;
 
 /* =========================================
@@ -1343,7 +1358,7 @@ document.querySelectorAll(".period-tab").forEach(button => {
 });
 
 /* =========================================
-   CAMERA (Presence / MediaPipe)
+   CAMERA (Presence)
 ========================================= */
 
 async function ensureCameraStream() {
@@ -1370,17 +1385,6 @@ async function ensureCameraStream() {
     return cameraStream;
 }
 
-async function ensurePresenceVideoReady() {
-    if (!cameraStream) return false;
-    if (presenceVideo.readyState >= 2) return true;
-
-    try {
-        if (presenceVideo.paused) await presenceVideo.play();
-    } catch {}
-
-    return presenceVideo.readyState >= 2;
-}
-
 function releaseCameraIfUnused() {
     if (isStudying) return;
     if (cameraStream) {
@@ -1391,7 +1395,7 @@ function releaseCameraIfUnused() {
 }
 
 /* =========================================
-   CAMERA (Sharing / WebRTC)
+   CAMERA (Sharing)
 ========================================= */
 
 async function ensureShareStream() {
@@ -1688,42 +1692,49 @@ function setupSocket() {
 }
 
 /* =========================================
-   MEDIAPIPE FACELANDMARKER
+   MEDIAPIPE FACELANDMARKER — کاملاً محلی
 ========================================= */
 
 async function initializeFaceLandmarker() {
     if (faceLandmarker) return faceLandmarker;
 
-    const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-    );
+    try {
+        // 1) WASM runtime از پوشه‌ی محلی
+        const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_PATH);
 
-    faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-        baseOptions: {
-            // مدل را در public/mediapipe/ قرار دهید
-            modelAssetPath: "/mediapipe/face_landmarker.task",
-            delegate: "CPU"
-        },
-        runningMode: "VIDEO",
-        numFaces: 1,
-        outputFaceBlendshapes: true,
-        minFaceDetectionConfidence: 0.5,
-        minFacePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5
-    });
+        // 2) مدل از پوشه‌ی محلی
+        faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+            baseOptions: {
+                modelAssetPath: FACE_LANDMARKER_MODEL_PATH,
+                delegate: "CPU"
+            },
+            runningMode: "VIDEO",
+            numFaces: 1,
+            outputFaceBlendshapes: true,
+            minFaceDetectionConfidence: 0.5,
+            minFacePresenceConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
 
-    return faceLandmarker;
+        console.log("FaceLandmarker (local) ready.");
+        return faceLandmarker;
+    } catch (error) {
+        console.error("Failed to initialize local FaceLandmarker:", error);
+        throw new Error(
+            "Could not load MediaPipe locally. " +
+            "Make sure /mediapipe/face_landmarker.task and " +
+            "/mediapipe/wasm/* files exist and are served correctly."
+        );
+    }
 }
 
 /*
  * تحلیل جهت سر با landmarkها.
- * شاخص‌های MediaPipe FaceLandmarker:
  *   33  = گوشه بیرونی چشم چپ
  *   133 = گوشه داخلی چشم چپ
  *   362 = گوشه داخلی چشم راست
  *   263 = گوشه بیرونی چشم راست
  *   1   = نوک بینی
- * اگر بینی از مرکز چشم‌ها خیلی فاصله داشته باشد → سر چرخیده → distracted
  */
 function analyzeFaceResult(result) {
     const landmarks = result?.faceLandmarks?.[0];
@@ -1765,7 +1776,7 @@ function analyzeFaceResult(result) {
 }
 
 /* =========================================
-   STUDY CLOCK (مستقل از detection)
+   STUDY CLOCK
 ========================================= */
 
 function startStudyClock() {
@@ -1829,29 +1840,36 @@ function updateStableStudyState(nextState) {
     }
 
     const stableDuration = now - candidateStateSince;
-    if (stableDuration >= STATE_STABILITY_MS) {
-        if (isPresent !== (candidateState === "focused")) {
-            isPresent = (candidateState === "focused");
+    if (stableDuration < STATE_STABILITY_MS) return;
 
-            // UI
-            if (studyState.value === "focused") {
-                studyIndicator.classList.add("active");
-                studyIndicator.classList.remove("distracted");
-                presenceText.textContent = "You are present · Time is being recorded";
-            } else if (candidateState === "distracted") {
-                studyIndicator.classList.remove("active");
-                studyIndicator.classList.add("distracted");
-                presenceText.textContent = "Head turned away — look at the screen";
-            } else {
-                studyIndicator.classList.remove("active", "distracted");
-                presenceText.textContent = "Waiting for your presence...";
-            }
-        }
+    const nextPresent = (candidateState === "focused");
+    if (isPresent === nextPresent && candidateState === "focused") {
+        // already focused — UI update only
+        studyIndicator.classList.add("active");
+        studyIndicator.classList.remove("distracted");
+        presenceText.textContent = "You are present · Time is being recorded";
+        return;
+    }
+    if (isPresent === nextPresent) return;
+
+    isPresent = nextPresent;
+
+    if (candidateState === "focused") {
+        studyIndicator.classList.add("active");
+        studyIndicator.classList.remove("distracted");
+        presenceText.textContent = "You are present · Time is being recorded";
+    } else if (candidateState === "distracted") {
+        studyIndicator.classList.remove("active");
+        studyIndicator.classList.add("distracted");
+        presenceText.textContent = "Head turned away — look at the screen";
+    } else {
+        studyIndicator.classList.remove("active", "distracted");
+        presenceText.textContent = "Waiting for your presence...";
     }
 }
 
 /* =========================================
-   DETECTION LOOP (requestAnimationFrame)
+   DETECTION LOOP
 ========================================= */
 
 function detectionTick() {
@@ -1883,23 +1901,16 @@ function detectionTick() {
     detectionBusy = true;
 
     try {
-        // timestamp باید یکنوا باشد و از زمان ویدیو گرفته شود
         const timestampMs = Math.round(video.currentTime * 1000);
-
         const result = faceLandmarker.detectForVideo(video, timestampMs);
         const faceCount = result?.faceLandmarks?.length || 0;
 
         if (faceCount === 0) {
-            // چهره گم شد — grace period
             if (!faceLostSince) {
                 faceLostSince = performance.now();
             }
-
             const lostDuration = performance.now() - faceLostSince;
-
-            if (lostDuration < FACE_LOST_GRACE_MS) {
-                // هنوز در grace — state فعلی را نگه دار
-            } else {
+            if (lostDuration >= FACE_LOST_GRACE_MS) {
                 updateStableStudyState("away");
                 latestConfidence = 0;
             }
@@ -1910,7 +1921,6 @@ function detectionTick() {
             updateStableStudyState(analysis.state);
         }
 
-        // ذخیره‌ی دوره‌ای
         if (Date.now() - lastSaveTime > 5000) {
             saveOwnStats();
             sendMyProfile();
@@ -1918,7 +1928,6 @@ function detectionTick() {
         }
     } catch (error) {
         console.warn("Detection error:", error);
-        // isPresent را عمداً تغییر نمی‌دهیم تا تایمر قطع نشود
     } finally {
         detectionBusy = false;
         setTimeout(detectionTick, DETECT_INTERVAL_MS);
@@ -1955,7 +1964,7 @@ function stopPresenceDetection() {
 }
 
 /* =========================================
-   PICTURE-IN-PICTURE + TIMER WIDGET
+   PICTURE-IN-PICTURE
 ========================================= */
 
 async function enterPiP() {
@@ -2005,11 +2014,8 @@ presenceVideo.addEventListener("leavepictureinpicture", () => {
 });
 
 pipBtn.addEventListener("click", async () => {
-    if (pipActive) {
-        await exitPiP();
-    } else {
-        await enterPiP();
-    }
+    if (pipActive) await exitPiP();
+    else await enterPiP();
 });
 
 /* =========================================
@@ -2041,9 +2047,7 @@ async function startStudy() {
             socket.emit("study-status", { studying: true });
         }
 
-        setTimeout(() => {
-            enterPiP().catch(() => {});
-        }, 500);
+        setTimeout(() => { enterPiP().catch(() => {}); }, 500);
 
         setStatus("Study session started. Presence detection is active.");
     } catch (error) {
@@ -2083,11 +2087,8 @@ async function stopStudy() {
 }
 
 studyBtn.addEventListener("click", async () => {
-    if (!isStudying) {
-        await startStudy();
-    } else {
-        await stopStudy();
-    }
+    if (!isStudying) await startStudy();
+    else await stopStudy();
 });
 
 /* =========================================
@@ -2099,18 +2100,9 @@ function validateInputs() {
     const password = passwordInput.value;
     const room = roomInput.value.trim();
 
-    if (!name) {
-        errorMsg.textContent = "Please enter your name.";
-        return false;
-    }
-    if (password.length < 8) {
-        errorMsg.textContent = "Password must contain at least 8 characters.";
-        return false;
-    }
-    if (!room) {
-        errorMsg.textContent = "Please enter a room code.";
-        return false;
-    }
+    if (!name) { errorMsg.textContent = "Please enter your name."; return false; }
+    if (password.length < 8) { errorMsg.textContent = "Password must contain at least 8 characters."; return false; }
+    if (!room) { errorMsg.textContent = "Please enter a room code."; return false; }
     if (!/^[a-zA-Z0-9_-]{1,40}$/.test(room)) {
         errorMsg.textContent = "Room code can only contain letters, numbers, _ and -.";
         return false;
@@ -2120,7 +2112,6 @@ function validateInputs() {
 }
 
 joinBtn.addEventListener("click", joinRoom);
-
 [nameInput, passwordInput, roomInput].forEach(input => {
     input.addEventListener("keydown", event => {
         if (event.key === "Enter") joinRoom();
