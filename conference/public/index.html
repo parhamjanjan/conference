@@ -830,10 +830,10 @@ button { color: inherit; }
 
 // حداقل کیفیت ممکن برای دیده شدن چهره‌ها — ۱۶۰×۹۰، ۱ فریم بر ثانیه، سقف ۸ kbps
 const VIDEO_SEND_PROFILE = {
-    width: 160,
-    height: 90,
-    fps: 1,
-    maxBitrate: 8000       // bits/second — hard cap per sender
+    width: 352,
+    height: 288,
+    fps: 6,
+    maxBitrate: 100000       // bits/second — hard cap per sender
 };
 
 // فاصله‌ی heartbeat/پروفایل — از ۱۵ ثانیه به ۶۰ ثانیه
@@ -1562,109 +1562,214 @@ function removePeer(peerId) {
    SOCKET.IO
 ========================================= */
 
+
+/* =========================================
+   SOCKET.IO — FIXED
+========================================= */
+
 function setupSocket() {
-    
-function setupSocket() {
+    if (socket) {
+        socket.disconnect();
+        socket = null;
+    }
+
     socket = io(window.location.origin, {
         path: "/socket.io/",
         transports: ["polling", "websocket"],
         upgrade: true,
         rememberUpgrade: false,
-
         reconnection: true,
         reconnectionAttempts: Infinity,
         reconnectionDelay: 2000,
         reconnectionDelayMax: 10000,
         timeout: 20000,
-
         forceNew: true
     });
 
     socket.on("connect", () => {
         console.log("[Socket.IO] Connected:", socket.id);
+
         console.log(
-            "[Socket.IO] Initial transport:",
+            "[Socket.IO] Transport:",
             socket.io.engine.transport.name
         );
 
         socket.emit("join", {
             room: roomName,
             peerId: myId,
-            userId,
+            userId: userId,
             name: userName
         });
 
         socket.io.engine.on("upgrade", transport => {
             console.log(
-                "[Socket.IO] Upgraded transport:",
+                "[Socket.IO] Upgraded:",
                 transport.name
             );
         });
     });
 
     socket.on("connect_error", error => {
-        console.error("[Socket.IO] Connection error:", error.message);
-        setStatus("Could not connect to the room server.", true);
+        console.error("[Socket.IO] Connection error:", error);
+
+        setStatus(
+            "Could not connect to the room server.",
+            true
+        );
     });
 
     socket.on("disconnect", reason => {
         console.warn("[Socket.IO] Disconnected:", reason);
     });
 
+    // =====================================
+    // JOIN ERROR
+    // =====================================
+
     socket.on("join-error", payload => {
-        setStatus(payload?.message || "Could not join the room.", true);
+        setStatus(
+            payload?.message || "Could not join the room.",
+            true
+        );
     });
+
+    // =====================================
+    // EXISTING MEMBERS
+    // =====================================
+
+    function addRemoteMember(member) {
+        if (!member?.peerId) return;
+        if (member.peerId === myId) return;
+        if (member.userId === userId) return;
+
+        const key = member.userId || member.peerId;
+
+        const previous = remoteMembers.get(key) || {};
+
+        const updated = {
+            ...previous,
+            ...member,
+            userId: key
+        };
+
+        remoteMembers.set(key, updated);
+
+        createVideoTile(
+            updated.peerId,
+            updated.name || "Participant"
+        );
+
+        // اگر دوربین این کاربر روشن است،
+        // ارتباط تصویری با عضو جدید برقرار شود.
+        if (isCamOn && shareStream) {
+            setTimeout(() => {
+                callPeer(updated.peerId);
+            }, 300);
+        }
+    }
 
     socket.on("others", others => {
         if (!Array.isArray(others)) return;
 
-        others.forEach(member => {
-            if (!member?.peerId || member.peerId === myId) return;
-
-            remoteMembers.set(member.userId || member.peerId, {
-                ...member,
-                userId: member.userId || member.peerId
-            });
-
-            createVideoTile(
-                member.peerId,
-                member.name || "Participant"
-            );
-
-            if (isCamOn && shareStream) {
-                setTimeout(() => callPeer(member.peerId), 300);
-            }
-        });
+        others.forEach(addRemoteMember);
 
         renderMembers();
         renderLeaderboard();
+
+        console.log(
+            "[Room] Existing members:",
+            remoteMembers.size
+        );
     });
 
-    socket.on("peer-joined", member => {
-        if (!member?.peerId || member.peerId === myId) return;
+    // =====================================
+    // NEW MEMBER
+    // =====================================
 
-        remoteMembers.set(member.userId || member.peerId, {
-            ...member,
-            userId: member.userId || member.peerId
+    socket.on("peer-joined", member => {
+        addRemoteMember(member);
+
+        renderMembers();
+        renderLeaderboard();
+
+        console.log(
+            "[Room] New member:",
+            member?.name,
+            member?.peerId
+        );
+    });
+
+    // =====================================
+    // MEMBER LIST — AUTHORITATIVE SYNC
+    // =====================================
+
+    socket.on("member-list", members => {
+        if (!Array.isArray(members)) return;
+
+        const activeIds = new Set();
+
+        members.forEach(member => {
+            if (!member?.userId) return;
+            if (member.userId === userId) return;
+
+            activeIds.add(member.userId);
+
+            const previous = remoteMembers.get(member.userId) || {};
+
+            const updated = {
+                ...previous,
+                ...member
+            };
+
+            remoteMembers.set(member.userId, updated);
+
+            if (updated.peerId) {
+                createVideoTile(
+                    updated.peerId,
+                    updated.name || "Participant"
+                );
+
+                if (isCamOn && shareStream) {
+                    callPeer(updated.peerId);
+                }
+            }
         });
 
-        createVideoTile(
-            member.peerId,
-            member.name || "Participant"
-        );
+        // حذف اعضایی که دیگر در اتاق نیستند
+        for (const [id, member] of remoteMembers.entries()) {
+            if (!activeIds.has(id)) {
+                if (member.peerId) {
+                    removePeer(member.peerId);
+                }
 
-        if (isCamOn && shareStream) {
-            setTimeout(() => callPeer(member.peerId), 300);
+                remoteMembers.delete(id);
+            }
         }
 
         renderMembers();
         renderLeaderboard();
+
+        console.log(
+            "[Room] Member list synchronized:",
+            members.length
+        );
     });
+
+    // =====================================
+    // MEMBER LEFT
+    // =====================================
 
     socket.on("peer-left", member => {
         if (!member) return;
 
-        removePeer(member.peerId);
+        console.log(
+            "[Room] Member left:",
+            member.peerId
+        );
+
+        if (member.peerId) {
+            removePeer(member.peerId);
+        }
 
         if (member.userId) {
             remoteMembers.delete(member.userId);
@@ -1674,8 +1779,12 @@ function setupSocket() {
         renderLeaderboard();
     });
 
+    // =====================================
+    // CAMERA STATUS
+    // =====================================
+
     socket.on("peer-cam-status", payload => {
-        if (!payload) return;
+        if (!payload?.peerId) return;
 
         const member = [...remoteMembers.values()]
             .find(item => item.peerId === payload.peerId);
@@ -1684,17 +1793,26 @@ function setupSocket() {
             member.camOn = payload.camOn === true;
         }
 
-        const dot = document.getElementById(`dot-${payload.peerId}`);
+        const dot = document.getElementById(
+            `dot-${payload.peerId}`
+        );
 
         if (dot) {
-            dot.classList.toggle("on", payload.camOn === true);
+            dot.classList.toggle(
+                "on",
+                payload.camOn === true
+            );
         }
 
         renderMembers();
     });
 
+    // =====================================
+    // STUDY STATUS
+    // =====================================
+
     socket.on("peer-study-status", payload => {
-        if (!payload) return;
+        if (!payload?.userId) return;
 
         const member = remoteMembers.get(payload.userId);
 
@@ -1705,48 +1823,9 @@ function setupSocket() {
         renderMembers();
     });
 
-    socket.on("member-list", members => {
-        if (!Array.isArray(members)) return;
-
-        members.forEach(member => {
-            if (!member?.userId || member.userId === userId) return;
-
-            const old = remoteMembers.get(member.userId) || {};
-
-            remoteMembers.set(member.userId, {
-                ...old,
-                ...member
-            });
-
-            if (member.peerId) {
-                createVideoTile(
-                    member.peerId,
-                    member.name || "Participant"
-                );
-            }
-        });
-
-        const activeIds = new Set(
-            members
-                .filter(member => member.userId !== userId)
-                .map(member => member.userId)
-        );
-
-        for (const id of remoteMembers.keys()) {
-            if (!activeIds.has(id)) {
-                const member = remoteMembers.get(id);
-
-                if (member?.peerId) {
-                    removePeer(member.peerId);
-                }
-
-                remoteMembers.delete(id);
-            }
-        }
-
-        renderMembers();
-        renderLeaderboard();
-    });
+    // =====================================
+    // STUDY PROFILE
+    // =====================================
 
     socket.on("study-profile-request", () => {
         sendMyProfile();
@@ -1755,114 +1834,8 @@ function setupSocket() {
     socket.on("study-profile", payload => {
         receiveProfile(payload);
     });
-}
 
-
-    socket.on("connect", () => {
-        socket.emit("join", {
-            room: roomName,
-            peerId: myId,
-            userId,
-            name: userName
-        });
-    });
-
-    socket.on("connect_error", error => {
-        console.error("Socket connection error:", error);
-        setStatus("Could not connect to the room server.", true);
-    });
-
-    socket.on("join-error", payload => {
-        setStatus(payload?.message || "Could not join the room.", true);
-    });
-
-    socket.on("others", others => {
-        if (!Array.isArray(others)) return;
-        others.forEach(member => {
-            if (!member?.peerId || member.peerId === myId) return;
-            remoteMembers.set(member.userId || member.peerId, {
-                ...member,
-                userId: member.userId || member.peerId
-            });
-            createVideoTile(member.peerId, member.name || "Participant");
-            if (isCamOn && shareStream) {
-                setTimeout(() => callPeer(member.peerId), 300);
-            }
-        });
-        renderMembers();
-        renderLeaderboard();
-    });
-
-    socket.on("peer-joined", member => {
-        if (!member?.peerId || member.peerId === myId) return;
-        remoteMembers.set(member.userId || member.peerId, {
-            ...member,
-            userId: member.userId || member.peerId
-        });
-        createVideoTile(member.peerId, member.name || "Participant");
-        if (isCamOn && shareStream) {
-            setTimeout(() => callPeer(member.peerId), 300);
-        }
-        renderMembers();
-        renderLeaderboard();
-    });
-
-    socket.on("peer-left", member => {
-        if (!member) return;
-        removePeer(member.peerId);
-        if (member.userId) remoteMembers.delete(member.userId);
-        renderMembers();
-        renderLeaderboard();
-    });
-
-    socket.on("peer-cam-status", payload => {
-        if (!payload) return;
-        const member = [...remoteMembers.values()]
-            .find(item => item.peerId === payload.peerId);
-        if (member) member.camOn = payload.camOn === true;
-        const dot = document.getElementById(`dot-${payload.peerId}`);
-        if (dot) dot.classList.toggle("on", payload.camOn === true);
-        renderMembers();
-    });
-
-    socket.on("peer-study-status", payload => {
-        if (!payload) return;
-        const member = remoteMembers.get(payload.userId);
-        if (member) member.studying = payload.studying === true;
-        renderMembers();
-    });
-
-    socket.on("member-list", members => {
-        if (!Array.isArray(members)) return;
-        members.forEach(member => {
-            if (!member?.userId || member.userId === userId) return;
-            const old = remoteMembers.get(member.userId) || {};
-            remoteMembers.set(member.userId, { ...old, ...member });
-            if (member.peerId) {
-                createVideoTile(member.peerId, member.name || "Participant");
-            }
-        });
-
-        const activeIds = new Set(
-            members
-                .filter(member => member.userId !== userId)
-                .map(member => member.userId)
-        );
-
-        for (const id of remoteMembers.keys()) {
-            if (!activeIds.has(id)) {
-                const member = remoteMembers.get(id);
-                if (member?.peerId) removePeer(member.peerId);
-                remoteMembers.delete(id);
-            }
-        }
-
-        renderMembers();
-        renderLeaderboard();
-    });
-
-    socket.on("study-profile-request", () => sendMyProfile());
-    socket.on("study-profile", payload => receiveProfile(payload));
+    console.log("[Socket.IO] Event listeners initialized.");
 }
 
 /* =========================================
