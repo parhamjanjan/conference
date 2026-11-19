@@ -19,13 +19,14 @@ const io = new Server(server, {
         origin: '*',
         methods: ['GET', 'POST']
     },
-    transports: ['websocket'],
+    transports: ['polling', 'websocket'],  // ✅ هر دو را مجاز کن
+    allowUpgrades: true,
+    upgradeTimeout: 10000,
     maxHttpBufferSize: 64 * 1024,
     perMessageDeflate: false,
     pingInterval: 25000,
     pingTimeout: 20000
 });
-
 // =====================================
 // PEERJS SERVER
 // =====================================
