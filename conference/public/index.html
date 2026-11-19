@@ -2566,7 +2566,7 @@
         const MAX_TICK_GAP_MS = 5000;
 
         // تنظیمات کیفیت بصری سمت گیرنده (بدون مصرف اینترنت اضافی)
-        const ENHANCEMENT_ENABLED = false;
+        const ENHANCEMENT_ENABLED = true;
 
         /* =========================================
            DOM
@@ -2806,78 +2806,100 @@
            CANVAS ENHANCEMENT (بدون مصرف اینترنت اضافی)
         ========================================= */
 
-        function startEnhancement(tile, video, peerId) {
-            if (!ENHANCEMENT_ENABLED) return;
-            if (enhancementMap.has(peerId)) return;
+function startEnhancement(tile, video, peerId) {
+    if (!ENHANCEMENT_ENABLED) return;
+    if (enhancementMap.has(peerId)) return;
 
-            const canvas = document.createElement("canvas");
-            canvas.className = "enhanced-video";
-            tile.appendChild(canvas);
+    const canvas = document.createElement("canvas");
+    canvas.className = "enhanced-video";
+    tile.appendChild(canvas);
 
-            const ctx = canvas.getContext("2d", { alpha: false });
-            const scratch = document.createElement("canvas");
-            const scratchCtx = scratch.getContext("2d", { willReadFrequently: true });
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) { canvas.remove(); return; }
 
-            const state = { canvas, ctx, scratch, scratchCtx, video, raf: 0, lastDraw: 0 };
-            enhancementMap.set(peerId, state);
-            tile.classList.add("enhanced");
+    const scratch = document.createElement("canvas");
+    const scratchCtx = scratch.getContext("2d", { willReadFrequently: true });
+    if (!scratchCtx) { canvas.remove(); return; }
 
-            const render = (now) => {
-                if (!enhancementMap.has(peerId)) return;
+    const state = {
+        canvas, ctx, scratch, scratchCtx, video,
+        raf: 0, lastDraw: 0,
+        firstFrameDrawn: false,
+        failures: 0
+    };
+    enhancementMap.set(peerId, state);
+    // ❌ tile.classList.add("enhanced") را اینجا نگذارید
 
-                if (video.readyState >= 2 && now - state.lastDraw >= 200) {
-                    state.lastDraw = now;
+    const render = (now) => {
+        if (!enhancementMap.has(peerId)) return;
 
-                    const w = VIDEO_SEND_PROFILE.width;
-                    const h = VIDEO_SEND_PROFILE.height;
+        if (video.readyState >= 2 && video.videoWidth > 0 && now - state.lastDraw >= 200) {
+            state.lastDraw = now;
 
-                    if (scratch.width !== w) {
-                        scratch.width = w;
-                        scratch.height = h;
-                        canvas.width = w * 2;
-                        canvas.height = h * 2;
-                    }
+            const w = video.videoWidth;
+            const h = video.videoHeight;
+            if (w < 3 || h < 3) { state.raf = requestAnimationFrame(render); return; }
 
-                    try {
-                        state.scratchCtx.drawImage(video, 0, 0, w, h);
-                        const frame = state.scratchCtx.getImageData(0, 0, w, h);
-                        const src = frame.data;
-                        const dst = new Uint8ClampedArray(src);
-                        const k = [0, -0.15, 0, -0.15, 1.6, -0.15, 0, -0.15, 0];
-
-                        for (let y = 1; y < h - 1; y++) {
-                            for (let x = 1; x < w - 1; x++) {
-                                const i = (y * w + x) * 4;
-                                for (let c = 0; c < 3; c++) {
-                                    let v = 0, kk = 0;
-                                    for (let dy = -1; dy <= 1; dy++) {
-                                        for (let dx = -1; dx <= 1; dx++) {
-                                            const p = ((y + dy) * w + (x + dx)) * 4 + c;
-                                            v += src[p] * k[kk++];
-                                        }
-                                    }
-                                    dst[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
-                                }
-                            }
-                        }
-                        frame.data.set(dst);
-                        state.scratchCtx.putImageData(frame, 0, 0);
-
-                        ctx.imageSmoothingEnabled = true;
-                        ctx.imageSmoothingQuality = "high";
-                        ctx.drawImage(scratch, 0, 0, canvas.width, canvas.height);
-                    } catch (e) {
-                        stopEnhancement(peerId);
-                        return;
-                    }
+            try {
+                if (scratch.width !== w) {
+                    scratch.width = w;
+                    scratch.height = h;
+                    canvas.width = w * 2;
+                    canvas.height = h * 2;
                 }
 
-                state.raf = requestAnimationFrame(render);
-            };
+                scratchCtx.drawImage(video, 0, 0, w, h);
+                const frame = scratchCtx.getImageData(0, 0, w, h);
+                const src = frame.data;
 
-            state.raf = requestAnimationFrame(render);
+                // فریم کاملاً سیاه را منتشر نکن
+                let nonBlack = 0;
+                for (let i = 0; i < src.length; i += 4 * 97) {
+                    if (src[i] || src[i + 1] || src[i + 2]) nonBlack++;
+                }
+                if (nonBlack === 0) { state.raf = requestAnimationFrame(render); return; }
+
+                const dst = new Uint8ClampedArray(src);
+                const k = [0, -0.15, 0, -0.15, 1.6, -0.15, 0, -0.15, 0];
+                for (let y = 1; y < h - 1; y++) {
+                    for (let x = 1; x < w - 1; x++) {
+                        const i = (y * w + x) * 4;
+                        for (let c = 0; c < 3; c++) {
+                            let v = 0, kk = 0;
+                            for (let dy = -1; dy <= 1; dy++) {
+                                for (let dx = -1; dx <= 1; dx++) {
+                                    const p = ((y + dy) * w + (x + dx)) * 4 + c;
+                                    v += src[p] * k[kk++];
+                                }
+                            }
+                            dst[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
+                        }
+                    }
+                }
+                frame.data.set(dst);
+                scratchCtx.putImageData(frame, 0, 0);
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = "high";
+                ctx.drawImage(scratch, 0, 0, canvas.width, canvas.height);
+
+                // فقط الان ویدیوی اصلی را مخفی کن
+                if (!state.firstFrameDrawn) {
+                    state.firstFrameDrawn = true;
+                    tile.classList.add("enhanced");
+                }
+                state.failures = 0;
+            } catch (e) {
+                state.failures++;
+                if (state.failures >= 3) { stopEnhancement(peerId); return; }
+            }
         }
 
+        state.raf = requestAnimationFrame(render);
+    };
+
+    state.raf = requestAnimationFrame(render);
+}
         function stopEnhancement(peerId) {
             const state = enhancementMap.get(peerId);
             if (!state) return;
@@ -2888,6 +2910,18 @@
             const tile = document.getElementById(`tile-${peerId}`);
             if (tile) tile.classList.remove("enhanced");
         }
+
+        document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        enhancementMap.forEach(state => {
+            if (state.raf) cancelAnimationFrame(state.raf);
+            state.raf = 0;
+        });
+    } else {
+        // بعد از برگشت تب، enhancement‌های مرده را پاک کن؛ با آمدن stream بعدی دوباره ساخته می‌شوند
+        [...enhancementMap.keys()].forEach(id => stopEnhancement(id));
+    }
+});
 
         /* =========================================
            VIDEO TILE
