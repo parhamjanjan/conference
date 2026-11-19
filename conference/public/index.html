@@ -652,14 +652,30 @@ button { color: inherit; }
 
 #statusMsg.error-text { color: var(--red); }
 
-.hidden-video {
+/* Presence video — visible so browser keeps rendering frames */
+.face-analysis-video {
     position: fixed;
-    width: 2px;
-    height: 2px;
-    opacity: 0;
-    pointer-events: none;
-    left: -10px;
-    bottom: -10px;
+    width: 180px;
+    height: 135px;
+    bottom: 16px;
+    right: 16px;
+    border-radius: 14px;
+    border: 2px solid var(--accent);
+    object-fit: cover;
+    background: #000;
+    z-index: 9998;
+    transform: scaleX(-1);
+    box-shadow: 0 10px 35px rgba(0,0,0,0.5);
+    transition: opacity .2s ease;
+}
+
+@media (max-width: 600px) {
+    .face-analysis-video {
+        width: 110px;
+        height: 82px;
+        bottom: 8px;
+        right: 8px;
+    }
 }
 
 /* PiP timer widget overlay */
@@ -869,7 +885,8 @@ button { color: inherit; }
     </main>
 </div>
 
-<video id="presenceVideo" class="hidden-video" autoplay muted playsinline></video>
+<!-- Presence video — visible for reliable frame delivery -->
+<video id="presenceVideo" class="face-analysis-video" autoplay muted playsinline></video>
 
 <!-- Floating PiP timer widget -->
 <div id="pipTimerWidget">
@@ -878,20 +895,17 @@ button { color: inherit; }
 </div>
 
 <script type="module">
-/*
- * همه‌چیز محلی:
- * - vision_bundle.mjs (نزدیک خود فایل HTML یا در /mediapipe/vision_bundle.mjs)
- * - WASM runtime از /mediapipe/wasm/
- * - مدل از /mediapipe/face_landmarker.task
- *
- * اگر vision_bundle.mjs را محلی گذاشتید، خط import زیر را به:
- *   import { FilesetResolver, FaceLandmarker } from "/mediapipe/vision_bundle.mjs";
- * تغییر دهید.
- */
 import {
     FilesetResolver,
     FaceLandmarker
 } from "/mediapipe/vision_bundle.mjs";
+
+/* =========================================
+   LOCAL MEDIAPIPE PATHS
+========================================= */
+
+const MEDIAPIPE_WASM_PATH = "/mediapipe/wasm";
+const FACE_LANDMARKER_MODEL_PATH = "/mediapipe/face_landmarker.task";
 
 /* =========================================
    DOM
@@ -926,13 +940,6 @@ const pipTimerWidget = $("pipTimerWidget");
 const pipTimerText = $("pipTimerText");
 
 /* =========================================
-   LOCAL MEDIA PIPE PATHS
-========================================= */
-
-const MEDIAPIPE_WASM_PATH = "/mediapipe/wasm";
-const FACE_LANDMARKER_MODEL_PATH = "/mediapipe/face_landmarker.task";
-
-/* =========================================
    STATE
 ========================================= */
 
@@ -954,8 +961,13 @@ let isPresent = false;
 let faceLandmarker = null;
 let detectionLoop = false;
 let detectionBusy = false;
-let lastVideoTime = -1;
 let lastSaveTime = 0;
+
+// Detection state
+let detectTimestamp = 0;
+let lastFrameTime = 0;
+let frameCount = 0;
+let detectionErrorShown = false;
 
 // Grace period
 const FACE_LOST_GRACE_MS = 1800;
@@ -1381,7 +1393,13 @@ async function ensureCameraStream() {
     });
 
     presenceVideo.srcObject = cameraStream;
-    await presenceVideo.play().catch(() => {});
+
+    try {
+        await presenceVideo.play();
+    } catch (e) {
+        console.warn("presenceVideo.play() failed:", e);
+    }
+
     return cameraStream;
 }
 
@@ -1692,17 +1710,15 @@ function setupSocket() {
 }
 
 /* =========================================
-   MEDIAPIPE FACELANDMARKER — کاملاً محلی
+   MEDIAPIPE FACELANDMARKER
 ========================================= */
 
 async function initializeFaceLandmarker() {
     if (faceLandmarker) return faceLandmarker;
 
     try {
-        // 1) WASM runtime از پوشه‌ی محلی
         const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_PATH);
 
-        // 2) مدل از پوشه‌ی محلی
         faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
             baseOptions: {
                 modelAssetPath: FACE_LANDMARKER_MODEL_PATH,
@@ -1723,19 +1739,11 @@ async function initializeFaceLandmarker() {
         throw new Error(
             "Could not load MediaPipe locally. " +
             "Make sure /mediapipe/face_landmarker.task and " +
-            "/mediapipe/wasm/* files exist and are served correctly."
+            "/mediapipe/wasm/* files exist."
         );
     }
 }
 
-/*
- * تحلیل جهت سر با landmarkها.
- *   33  = گوشه بیرونی چشم چپ
- *   133 = گوشه داخلی چشم چپ
- *   362 = گوشه داخلی چشم راست
- *   263 = گوشه بیرونی چشم راست
- *   1   = نوک بینی
- */
 function analyzeFaceResult(result) {
     const landmarks = result?.faceLandmarks?.[0];
 
@@ -1827,7 +1835,7 @@ function addStudySeconds(seconds) {
 }
 
 /* =========================================
-   STATE STABILITY + GRACE PERIOD
+   STATE STABILITY
 ========================================= */
 
 function updateStableStudyState(nextState) {
@@ -1843,13 +1851,6 @@ function updateStableStudyState(nextState) {
     if (stableDuration < STATE_STABILITY_MS) return;
 
     const nextPresent = (candidateState === "focused");
-    if (isPresent === nextPresent && candidateState === "focused") {
-        // already focused — UI update only
-        studyIndicator.classList.add("active");
-        studyIndicator.classList.remove("distracted");
-        presenceText.textContent = "You are present · Time is being recorded";
-        return;
-    }
     if (isPresent === nextPresent) return;
 
     isPresent = nextPresent;
@@ -1886,28 +1887,53 @@ function detectionTick() {
     }
 
     const video = presenceVideo;
+
     if (!video || video.readyState < 2) {
+        presenceText.textContent = "Waiting for camera frames...";
         setTimeout(detectionTick, DETECT_INTERVAL_MS);
         return;
     }
 
-    // فقط وقتی فریم جدید هست پردازش کن
-    if (video.currentTime === lastVideoTime) {
-        setTimeout(detectionTick, 80);
+    if (video.currentTime === lastFrameTime) {
+        if (!detectionErrorShown) {
+            console.warn("Video not producing new frames:", {
+                currentTime: video.currentTime,
+                readyState: video.readyState,
+                paused: video.paused,
+                ended: video.ended
+            });
+        }
+        setTimeout(detectionTick, 100);
         return;
     }
 
-    lastVideoTime = video.currentTime;
+    lastFrameTime = video.currentTime;
     detectionBusy = true;
+    frameCount++;
 
     try {
-        const timestampMs = Math.round(video.currentTime * 1000);
-        const result = faceLandmarker.detectForVideo(video, timestampMs);
+        detectTimestamp = Math.max(
+            detectTimestamp + 1,
+            Math.round(video.currentTime * 1000)
+        );
+
+        const result = faceLandmarker.detectForVideo(video, detectTimestamp);
         const faceCount = result?.faceLandmarks?.length || 0;
+
+        if (frameCount <= 10 || frameCount % 30 === 0) {
+            console.log("Detection frame:", {
+                frame: frameCount,
+                currentTime: video.currentTime.toFixed(2),
+                readyState: video.readyState,
+                faceCount,
+                timestamp: detectTimestamp
+            });
+        }
 
         if (faceCount === 0) {
             if (!faceLostSince) {
                 faceLostSince = performance.now();
+                console.log("Face lost — starting grace period");
             }
             const lostDuration = performance.now() - faceLostSince;
             if (lostDuration >= FACE_LOST_GRACE_MS) {
@@ -1927,7 +1953,11 @@ function detectionTick() {
             lastSaveTime = Date.now();
         }
     } catch (error) {
-        console.warn("Detection error:", error);
+        console.error("Detection error:", error);
+        if (!detectionErrorShown) {
+            detectionErrorShown = true;
+            presenceText.textContent = "Detection error — check console";
+        }
     } finally {
         detectionBusy = false;
         setTimeout(detectionTick, DETECT_INTERVAL_MS);
@@ -1936,11 +1966,35 @@ function detectionTick() {
 
 async function startPresenceDetection() {
     await ensureCameraStream();
+
+    try {
+        if (presenceVideo.paused) {
+            await presenceVideo.play();
+        }
+    } catch (e) {
+        console.warn("presenceVideo.play() failed:", e);
+    }
+
+    await new Promise((resolve, reject) => {
+        if (presenceVideo.readyState >= 2) return resolve();
+        const timeout = setTimeout(
+            () => reject(new Error("Video metadata not ready after 5s")),
+            5000
+        );
+        presenceVideo.addEventListener("loadeddata", () => {
+            clearTimeout(timeout);
+            resolve();
+        }, { once: true });
+    });
+
     await initializeFaceLandmarker();
 
     detectionLoop = true;
-    lastVideoTime = -1;
+    lastFrameTime = 0;
+    detectTimestamp = 0;
     faceLostSince = 0;
+    frameCount = 0;
+    detectionErrorShown = false;
 
     presenceText.textContent = "Camera ready. Detecting your presence...";
     detectionTick();
@@ -1953,6 +2007,8 @@ function stopPresenceDetection() {
     faceLostSince = 0;
     candidateState = "away";
     candidateStateSince = 0;
+    frameCount = 0;
+    detectionErrorShown = false;
     studyIndicator.classList.remove("active", "distracted");
 
     if (faceLandmarker) {
@@ -1969,7 +2025,10 @@ function stopPresenceDetection() {
 
 async function enterPiP() {
     if (document.pictureInPictureElement) return;
-    if (!presenceVideo.srcObject) return;
+    if (!presenceVideo.srcObject) {
+        setStatus("Camera is not ready for Mini Timer.", true);
+        return;
+    }
     try {
         if (presenceVideo.paused) await presenceVideo.play();
         await presenceVideo.requestPictureInPicture();
@@ -1979,10 +2038,7 @@ async function enterPiP() {
         pipTimerText.textContent = studyTimer.textContent;
     } catch (err) {
         console.warn("PiP failed:", err);
-        pipActive = true;
-        pipBtnText.textContent = "Close Mini Timer";
-        pipTimerWidget.classList.add("visible");
-        pipTimerText.textContent = studyTimer.textContent;
+        setStatus("Mini Timer unavailable in this browser.", true);
     }
 }
 
@@ -2047,9 +2103,7 @@ async function startStudy() {
             socket.emit("study-status", { studying: true });
         }
 
-        setTimeout(() => { enterPiP().catch(() => {}); }, 500);
-
-        setStatus("Study session started. Presence detection is active.");
+        setStatus("Study session started. Click 'Mini Timer' to enable PiP.");
     } catch (error) {
         console.error(error);
         detectionLoop = false;
