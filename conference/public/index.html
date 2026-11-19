@@ -1,913 +1,2259 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conference Hall</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-    <style>
-        :root {
-            --bg: #0a0a0f;
-            --surface: #13131a;
-            --surface-2: #1a1a24;
-            --border: #26262f;
-            --text: #f5f5f7;
-            --text-dim: #8a8a94;
-            --accent: #6366f1;
-            --accent-hover: #7c7ff5;
-            --green: #10b981;
-            --red: #ef4444;
-            --radius: 14px;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#080911">
+<title>Focus Hall — Study Together</title>
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-        body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            padding: 24px;
-            -webkit-font-smoothing: antialiased;
-        }
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
 
-        /* Background subtle gradient */
-        body::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            background:
-                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.15), transparent),
-                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(99, 102, 241, 0.08), transparent);
-            pointer-events: none;
-            z-index: -1;
-        }
+<style>
+:root {
+    --bg: #080911;
+    --surface: rgba(24,25,42,.72);
+    --surface2: rgba(255,255,255,.045);
+    --border: rgba(255,255,255,.09);
+    --text: #f5f5f7;
+    --muted: #9293a5;
+    --accent: #7775f5;
+    --purple: #a78bfa;
+    --green: #10b981;
+    --red: #f43f5e;
+    --gold: #fbbf24;
+    --radius: 18px;
+}
 
-        /* ===== JOIN SCREEN ===== */
-        #joinScreen {
-            min-height: calc(100vh - 48px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .join-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 48px 40px;
-            width: 100%;
-            max-width: 420px;
-            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
-        }
-        .join-card .logo {
-            width: 56px; height: 56px;
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            border-radius: 16px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 28px;
-            margin-bottom: 24px;
-        }
-        .join-card h1 {
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            margin-bottom: 8px;
-        }
-        .join-card p {
-            color: var(--text-dim);
-            font-size: 15px;
-            line-height: 1.5;
-            margin-bottom: 32px;
-        }
-        .field { margin-bottom: 16px; }
-        .field label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-dim);
-            margin-bottom: 8px;
-            letter-spacing: 0.3px;
-            text-transform: uppercase;
-        }
-        .field input {
-            width: 100%;
-            padding: 14px 16px;
-            background: var(--surface-2);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: var(--text);
-            font-size: 15px;
-            font-family: inherit;
-            outline: none;
-            transition: all 0.2s;
-        }
-        .field input::placeholder { color: #55555f; }
-        .field input:focus {
-            border-color: var(--accent);
-            background: #1c1c28;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-        }
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
 
-        .btn-primary {
-            width: 100%;
-            padding: 15px;
-            background: var(--accent);
-            border: none;
-            border-radius: 12px;
-            color: #fff;
-            font-size: 15px;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-top: 8px;
-        }
-        .btn-primary:hover:not(:disabled) {
-            background: var(--accent-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
-        }
-        .btn-primary:active:not(:disabled) { transform: translateY(0); }
-        .btn-primary:disabled {
-            background: var(--surface-2);
-            color: var(--text-dim);
-            cursor: not-allowed;
-        }
-        .error {
-            color: var(--red);
-            font-size: 13px;
-            margin-top: 14px;
-            min-height: 18px;
-            text-align: center;
-        }
+body {
+    min-height: 100vh;
+    padding: 24px;
+    color: var(--text);
+    background:
+        radial-gradient(ellipse at 10% 5%, rgba(99,102,241,.18), transparent 35%),
+        radial-gradient(ellipse at 90% 85%, rgba(139,92,246,.13), transparent 35%),
+        var(--bg);
+    font-family: Inter, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
 
-        /* ===== ROOM SCREEN ===== */
-        #roomScreen { display: none; max-width: 1600px; margin: 0 auto; }
-        #roomScreen.active { display: block; }
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(to bottom, black, transparent);
+}
 
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-        .topbar-left { display: flex; align-items: center; gap: 14px; }
-        .brand-icon {
-            width: 40px; height: 40px;
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            border-radius: 11px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 20px;
-        }
-        .topbar h2 {
-            font-size: 18px;
-            font-weight: 700;
-            letter-spacing: -0.3px;
-        }
-        .topbar h2 span { color: var(--text-dim); font-weight: 500; }
-        .user-chip {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            padding: 8px 16px;
-            border-radius: 100px;
-            font-size: 14px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .user-chip .avatar {
-            width: 24px; height: 24px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 12px; font-weight: 700;
-        }
+button, input {
+    font: inherit;
+}
 
-        /* ===== MAIN LAYOUT ===== */
-        .layout {
-            display: grid;
-            grid-template-columns: 1fr 280px;
-            gap: 20px;
-        }
-        @media (max-width: 960px) {
-            .layout { grid-template-columns: 1fr; }
-            .members-panel { order: -1; }
-        }
+button {
+    color: inherit;
+}
 
-        /* ===== VIDEO GRID ===== */
-        #videoGrid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 16px;
-            align-content: start;
-        }
-        .video-tile {
-            position: relative;
-            aspect-ratio: 16/9;
-            background: var(--surface);
-            border-radius: var(--radius);
-            overflow: hidden;
-            border: 1px solid var(--border);
-            transition: border-color 0.2s;
-        }
-        .video-tile:hover { border-color: #3a3a48; }
-        .video-tile video {
-            width: 100%; height: 100%;
-            object-fit: cover;
-            background: #000;
-        }
-        .video-tile.mirror video { transform: scaleX(-1); }
+.glass {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow:
+        0 25px 80px rgba(0,0,0,.25),
+        inset 0 1px 0 rgba(255,255,255,.04);
+}
 
-        .video-tile .placeholder {
-            position: absolute; inset: 0;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            gap: 14px;
-            background: var(--surface);
-        }
-        .video-tile .avatar-lg {
-            width: 88px; height: 88px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #26262f, #1a1a24);
-            border: 2px solid var(--border);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 36px;
-            font-weight: 700;
-            color: var(--text-dim);
-        }
-        .video-tile .placeholder .txt {
-            color: var(--text-dim);
-            font-size: 13px;
-            font-weight: 500;
-        }
-        .video-tile.has-video .placeholder { display: none; }
+/* JOIN */
 
-        .name-tag {
-            position: absolute;
-            bottom: 12px; left: 12px;
-            background: rgba(10, 10, 15, 0.8);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            display: flex; align-items: center; gap: 8px;
-            border: 1px solid rgba(255,255,255,0.08);
-            max-width: calc(100% - 24px);
-        }
-        .name-tag .name-text {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .dot {
-            width: 7px; height: 7px;
-            border-radius: 50%;
-            background: var(--red);
-            flex-shrink: 0;
-            transition: all 0.2s;
-        }
-        .dot.on {
-            background: var(--green);
-            box-shadow: 0 0 8px var(--green);
-        }
-        .you-tag {
-            position: absolute;
-            top: 12px; right: 12px;
-            background: var(--accent);
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
+#joinScreen {
+    min-height: calc(100vh - 48px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-        /* ===== MEMBERS PANEL ===== */
-        .members-panel {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px;
-            height: fit-content;
-            position: sticky;
-            top: 24px;
-        }
-        .panel-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-        .panel-header h3 {
-            font-size: 14px;
-            font-weight: 700;
-            letter-spacing: 0.3px;
-            text-transform: uppercase;
-            color: var(--text-dim);
-        }
-        .count-badge {
-            background: var(--accent);
-            color: #fff;
-            padding: 2px 10px;
-            border-radius: 100px;
-            font-size: 12px;
-            font-weight: 700;
-        }
-        .member-list { display: flex; flex-direction: column; gap: 6px; }
-        .member-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 12px;
-            background: var(--surface-2);
-            border-radius: 10px;
-            font-size: 14px;
-            transition: background 0.15s;
-        }
-        .member-item:hover { background: #1f1f2a; }
-        .member-avatar {
-            width: 34px; height: 34px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #26262f, #1a1a24);
-            border: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--text-dim);
-            flex-shrink: 0;
-        }
-        .member-item.me .member-avatar {
-            background: linear-gradient(135deg, var(--accent), #8b5cf6);
-            color: #fff;
-            border-color: transparent;
-        }
-        .member-name {
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            font-weight: 500;
-        }
-        .member-name .you-label {
-            color: var(--accent);
-            font-size: 11px;
-            font-weight: 700;
-            margin-left: 4px;
-        }
-        .member-status {
-            width: 8px; height: 8px;
-            border-radius: 50%;
-            background: #3a3a48;
-            flex-shrink: 0;
-        }
-        .member-status.cam-on {
-            background: var(--green);
-            box-shadow: 0 0 6px var(--green);
-        }
+.join-card {
+    width: 100%;
+    max-width: 440px;
+    padding: 42px;
+    border-radius: 26px;
+    position: relative;
+    overflow: hidden;
+    animation: enter .6s ease both;
+}
 
-        /* ===== CONTROLS ===== */
-        .controls {
-            display: flex;
-            justify-content: center;
-            margin-top: 24px;
-        }
-        .btn-cam {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 14px 32px;
-            border: none;
-            border-radius: 100px;
-            font-size: 15px;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-            transition: all 0.2s;
-            background: var(--green);
-            color: #fff;
-            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
-        }
-        .btn-cam:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 28px rgba(16, 185, 129, 0.45);
-        }
-        .btn-cam:active { transform: translateY(0); }
-        .btn-cam.off {
-            background: var(--red);
-            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
-        }
-        .btn-cam.off:hover {
-            box-shadow: 0 8px 28px rgba(239, 68, 68, 0.45);
-        }
-        .btn-cam svg {
-            width: 20px; height: 20px;
-        }
+.join-card::before {
+    content: "";
+    position: absolute;
+    width: 240px;
+    height: 240px;
+    top: -150px;
+    right: -100px;
+    background: var(--accent);
+    filter: blur(95px);
+    opacity: .35;
+    pointer-events: none;
+}
 
-        #statusMsg {
-            text-align: center;
-            margin-top: 16px;
-            font-size: 13px;
-            color: var(--text-dim);
-            min-height: 20px;
-            font-weight: 500;
-        }
-        #statusMsg.error-text { color: var(--red); }
+.logo {
+    width: 58px;
+    height: 58px;
+    display: grid;
+    place-items: center;
+    border-radius: 17px;
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    box-shadow: 0 10px 35px rgba(99,102,241,.3);
+    margin-bottom: 25px;
+}
 
-        /* Loading spinner */
-        .spinner {
-            width: 16px; height: 16px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.6s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
+.logo svg {
+    width: 28px;
+    height: 28px;
+}
 
-        /* Empty state */
-        .empty-state {
-            grid-column: 1 / -1;
-            text-align: center;
-            padding: 80px 20px;
-            color: var(--text-dim);
-        }
-        .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
-        .empty-state p { font-size: 15px; }
-    </style>
+.join-card h1 {
+    font-size: 29px;
+    letter-spacing: -1px;
+    margin-bottom: 9px;
+}
+
+.join-card > p {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 30px;
+}
+
+.field {
+    margin-bottom: 17px;
+}
+
+.field label {
+    display: block;
+    margin-bottom: 9px;
+    color: #b9bac8;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .7px;
+    text-transform: uppercase;
+}
+
+.field input {
+    width: 100%;
+    padding: 15px 16px;
+    color: white;
+    outline: none;
+    background: rgba(255,255,255,.045);
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    transition: .2s ease;
+}
+
+.field input::placeholder {
+    color: #626477;
+}
+
+.field input:focus {
+    border-color: #818cf8;
+    background: rgba(99,102,241,.07);
+    box-shadow: 0 0 0 4px rgba(99,102,241,.12);
+}
+
+.field-hint {
+    display: block;
+    margin-top: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.btn-primary {
+    width: 100%;
+    padding: 15px;
+    margin-top: 8px;
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 13px;
+    color: white;
+    background: linear-gradient(115deg, #6366f1, #8b5cf6);
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 25px rgba(99,102,241,.2);
+    transition: .25s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(99,102,241,.35);
+}
+
+.btn-primary:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.error {
+    min-height: 20px;
+    margin-top: 14px;
+    color: var(--red);
+    text-align: center;
+    font-size: 12px;
+}
+
+/* ROOM */
+
+#roomScreen {
+    display: none;
+    max-width: 1500px;
+    margin: 0 auto;
+}
+
+#roomScreen.active {
+    display: block;
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    flex-wrap: wrap;
+    padding: 15px 19px;
+    margin-bottom: 22px;
+    border-radius: 18px;
+}
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+}
+
+.brand-icon {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 13px;
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+}
+
+.brand-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.topbar h2 {
+    font-size: 16px;
+    font-weight: 750;
+}
+
+.topbar h2 span {
+    color: var(--muted);
+    font-weight: 500;
+}
+
+.user-chip {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 13px 7px 8px;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    background: rgba(255,255,255,.04);
+    font-size: 13px;
+    font-weight: 650;
+}
+
+.avatar {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) 270px;
+    gap: 18px;
+}
+
+@media(max-width: 950px) {
+    .layout {
+        grid-template-columns: 1fr;
+    }
+
+    .members-panel {
+        order: -1;
+        position: static !important;
+    }
+}
+
+/* VIDEO */
+
+#videoGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%,290px),1fr));
+    gap: 15px;
+    align-content: start;
+}
+
+.video-tile {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    min-height: 170px;
+    border-radius: 19px;
+    background: #11121e;
+    border: 1px solid var(--border);
+    transition: .25s ease;
+}
+
+.video-tile:hover {
+    transform: translateY(-2px);
+    border-color: rgba(129,140,248,.4);
+    box-shadow: 0 15px 40px rgba(0,0,0,.25);
+}
+
+.video-tile video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #080911;
+}
+
+.video-tile.mirror video {
+    transform: scaleX(-1);
+}
+
+.placeholder {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 13px;
+    background:
+        radial-gradient(circle at center, rgba(99,102,241,.1), transparent 65%),
+        #11121e;
+}
+
+.avatar-lg {
+    width: 75px;
+    height: 75px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #27283e, #171827);
+    border: 1px solid rgba(255,255,255,.12);
+    color: #c4c5d5;
+    font-size: 30px;
+    font-weight: 750;
+}
+
+.placeholder .txt {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.video-tile.has-video .placeholder {
+    display: none;
+}
+
+.name-tag {
+    position: absolute;
+    z-index: 2;
+    bottom: 11px;
+    left: 11px;
+    max-width: calc(100% - 22px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 11px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 9px;
+    background: rgba(8,9,17,.76);
+    backdrop-filter: blur(14px);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--red);
+}
+
+.dot.on {
+    background: var(--green);
+    box-shadow: 0 0 9px var(--green);
+}
+
+.you-tag {
+    position: absolute;
+    z-index: 2;
+    top: 11px;
+    right: 11px;
+    padding: 5px 9px;
+    border-radius: 7px;
+    background: #6366f1;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .5px;
+}
+
+/* MEMBERS */
+
+.members-panel {
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+    padding: 19px;
+    border-radius: 19px;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.panel-header h3 {
+    color: #b5b6c7;
+    font-size: 12px;
+    letter-spacing: .7px;
+    text-transform: uppercase;
+}
+
+.count-badge {
+    padding: 3px 10px;
+    border-radius: 30px;
+    background: rgba(99,102,241,.25);
+    color: #c7c6ff;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.member-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.member-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: rgba(255,255,255,.035);
+    transition: .2s ease;
+}
+
+.member-item:hover {
+    background: rgba(255,255,255,.07);
+    border-color: var(--border);
+}
+
+.member-avatar {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: linear-gradient(135deg, #25263b, #171827);
+    color: #c8c9d8;
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.member-item.me .member-avatar {
+    background: linear-gradient(135deg, #6366f1, #a78bfa);
+    color: white;
+}
+
+.member-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.you-label {
+    color: #a5a4ff;
+    font-size: 10px;
+}
+
+.member-status {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #55566a;
+}
+
+.member-status.cam-on {
+    background: var(--green);
+    box-shadow: 0 0 7px var(--green);
+}
+
+.member-study {
+    color: #a5b4fc;
+    font-size: 10px;
+}
+
+/* CONTROLS */
+
+.controls {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.control-button {
+    min-width: 185px;
+    min-height: 51px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 13px 20px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    color: white;
+    font-size: 13px;
+    font-weight: 750;
+    cursor: pointer;
+    transition: .22s ease;
+}
+
+.control-button svg {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+}
+
+.control-button:hover:not(:disabled) {
+    transform: translateY(-3px);
+    filter: brightness(1.12);
+}
+
+.control-button:active {
+    transform: scale(.97);
+}
+
+.control-button:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.study-button {
+    background: linear-gradient(120deg, #059669, #10b981);
+    box-shadow: 0 8px 24px rgba(16,185,129,.16);
+}
+
+.study-button.active {
+    background: linear-gradient(120deg, #b45309, #f59e0b);
+}
+
+.camera-button {
+    background: linear-gradient(120deg, #4f46e5, #6366f1);
+    box-shadow: 0 8px 24px rgba(99,102,241,.18);
+}
+
+.camera-button.active {
+    background: linear-gradient(120deg, #be123c, #f43f5e);
+}
+
+/* STUDY PANEL */
+
+.study-panel,
+.leaderboard-panel {
+    margin-top: 19px;
+    padding: 20px;
+    border-radius: 19px;
+}
+
+.study-panel {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.study-info {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+}
+
+.study-indicator {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: #64748b;
+    box-shadow: 0 0 0 5px rgba(100,116,139,.1);
+}
+
+.study-indicator.active {
+    background: var(--green);
+    box-shadow: 0 0 0 5px rgba(16,185,129,.12), 0 0 18px rgba(16,185,129,.6);
+    animation: pulse 1.8s infinite;
+}
+
+#studyStateText {
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.study-subtitle {
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.study-timer {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* LEADERBOARD */
+
+.leaderboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 13px;
+    margin-bottom: 18px;
+}
+
+.leaderboard-title {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.period-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.period-tab {
+    padding: 8px 11px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: rgba(255,255,255,.035);
+    color: var(--muted);
+    font-size: 11px;
+    cursor: pointer;
+    transition: .2s ease;
+}
+
+.period-tab:hover,
+.period-tab.active {
+    color: white;
+    border-color: rgba(129,140,248,.4);
+    background: rgba(99,102,241,.2);
+}
+
+.leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.leaderboard-item {
+    display: grid;
+    grid-template-columns: 36px minmax(0,1fr) auto;
+    align-items: center;
+    gap: 11px;
+    padding: 11px;
+    border: 1px solid rgba(255,255,255,.055);
+    border-radius: 12px;
+    background: rgba(255,255,255,.035);
+    animation: enter .3s ease both;
+}
+
+.leaderboard-rank {
+    width: 33px;
+    height: 33px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: rgba(255,255,255,.06);
+    color: #c5c6d5;
+    font-size: 12px;
+    font-weight: 850;
+}
+
+.leaderboard-item:first-child .leaderboard-rank {
+    color: #161616;
+    background: linear-gradient(135deg, #fde68a, #f59e0b);
+}
+
+.leaderboard-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.leaderboard-time {
+    color: #b2b0ff;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.empty-leaderboard {
+    padding: 25px 10px;
+    color: var(--muted);
+    text-align: center;
+    font-size: 12px;
+}
+
+#statusMsg {
+    min-height: 20px;
+    margin-top: 15px;
+    color: var(--muted);
+    text-align: center;
+    font-size: 12px;
+}
+
+#statusMsg.error-text {
+    color: var(--red);
+}
+
+.hidden-video {
+    position: fixed;
+    width: 2px;
+    height: 2px;
+    opacity: 0;
+    pointer-events: none;
+    left: -10px;
+    bottom: -10px;
+}
+
+@keyframes pulse {
+    50% { opacity: .55; }
+}
+
+@keyframes enter {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media(max-width: 600px) {
+    body {
+        padding: 12px;
+    }
+
+    #joinScreen {
+        min-height: calc(100vh - 24px);
+    }
+
+    .join-card {
+        padding: 30px 22px;
+    }
+
+    .topbar {
+        padding: 12px;
+    }
+
+    .control-button {
+        flex: 1 1 145px;
+        min-width: 0;
+    }
+
+    .study-panel,
+    .leaderboard-panel {
+        padding: 15px;
+    }
+
+    .study-timer {
+        font-size: 22px;
+    }
+}
+
+@media(prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+    }
+}
+</style>
 </head>
+
 <body>
 
-<!-- ===== JOIN SCREEN ===== -->
+<!-- JOIN SCREEN -->
+
 <div id="joinScreen">
-    <div class="join-card">
-        <div class="logo">🎥</div>
-        <h1>Conference Hall</h1>
-        <p>Join a room and share your camera with others in real time.</p>
+    <div class="join-card glass">
+
+        <div class="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="5" width="13" height="14" rx="2"/>
+                <path d="m16 10 5-3v10l-5-3"/>
+            </svg>
+        </div>
+
+        <h1>Focus Hall</h1>
+        <p>Join your study room, stay focused, and make progress together.</p>
 
         <div class="field">
-            <label>Your Name</label>
-            <input type="text" id="nameInput" placeholder="John Doe" maxlength="30" autocomplete="off">
+            <label for="nameInput">Your Name</label>
+            <input id="nameInput" type="text" maxlength="30"
+                   placeholder="Enter your name" autocomplete="name">
         </div>
 
         <div class="field">
-            <label>Room Code</label>
-            <input type="text" id="roomInput" placeholder="team-standup" maxlength="40" autocomplete="off">
+            <label for="passwordInput">Account Password</label>
+            <input id="passwordInput" type="password" minlength="8"
+                   maxlength="128" placeholder="Create or enter your password"
+                   autocomplete="current-password">
+            <small class="field-hint">
+                Use the same password to access the same study identity on another device.
+                This is a personal-project identity key, not secure account authentication.
+            </small>
         </div>
 
-        <button id="joinBtn" class="btn-primary" disabled>Join Room</button>
+        <div class="field">
+            <label for="roomInput">Room Code</label>
+            <input id="roomInput" type="text" maxlength="40"
+                   placeholder="e.g. study-room-01" autocomplete="off">
+        </div>
+
+        <button id="joinBtn" class="btn-primary">Join Study Room</button>
         <div class="error" id="errorMsg"></div>
+
     </div>
 </div>
 
-<!-- ===== ROOM SCREEN ===== -->
+<!-- ROOM SCREEN -->
+
 <div id="roomScreen">
-    <div class="topbar">
+
+    <header class="topbar glass">
+
         <div class="topbar-left">
-            <div class="brand-icon">🎥</div>
-            <h2>Conference Hall <span>/ <span id="roomNameLabel"></span></span></h2>
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="white"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 19V5"/>
+                    <path d="M4 19h16"/>
+                    <path d="m7 15 4-5 3 3 5-7"/>
+                </svg>
+            </div>
+
+            <h2>Focus Hall <span>/ <span id="roomNameLabel"></span></span></h2>
         </div>
-        <div class="user-chip" id="userBadge">
+
+        <div class="user-chip">
             <span class="avatar" id="userAvatar">?</span>
             <span id="userNameLabel"></span>
         </div>
-    </div>
 
-    <div class="layout">
-        <div id="videoGrid"></div>
+    </header>
 
-        <div class="members-panel">
+    <main class="layout">
+
+        <section>
+            <div id="videoGrid"></div>
+
+            <div class="controls">
+
+                <button id="studyBtn" class="control-button study-button">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 6v6l4 2"/>
+                    </svg>
+                    <span id="studyBtnText">Start Studying</span>
+                </button>
+
+                <button id="toggleBtn" class="control-button camera-button">
+                    <svg id="camIcon" viewBox="0 0 24 24" fill="none"
+                         stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m23 7-7 5 7 5V7z"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2"/>
+                    </svg>
+                    <span id="toggleText">Share Camera</span>
+                </button>
+
+            </div>
+
+            <section class="study-panel glass">
+
+                <div class="study-info">
+                    <div id="studyIndicator" class="study-indicator"></div>
+
+                    <div>
+                        <div id="studyStateText">Study session inactive</div>
+                        <div class="study-subtitle" id="presenceText">
+                            Start studying to activate presence detection
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="study-timer" id="studyTimer">00:00:00</div>
+                    <div class="study-subtitle">Your study time</div>
+                </div>
+
+            </section>
+
+            <section class="leaderboard-panel glass">
+
+                <div class="leaderboard-header">
+                    <div class="leaderboard-title">🏆 Study Leaderboard</div>
+
+                    <div class="period-tabs">
+                        <button class="period-tab active" data-period="today">Today</button>
+                        <button class="period-tab" data-period="yesterday">Yesterday</button>
+                        <button class="period-tab" data-period="week">This Week</button>
+                        <button class="period-tab" data-period="all">All Time</button>
+                    </div>
+                </div>
+
+                <div id="leaderboardList" class="leaderboard-list">
+                    <div class="empty-leaderboard">Study statistics will appear here.</div>
+                </div>
+
+            </section>
+
+            <div id="statusMsg"></div>
+        </section>
+
+        <aside class="members-panel glass">
+
             <div class="panel-header">
                 <h3>Participants</h3>
-                <span class="count-badge" id="memberCount">0</span>
+                <span class="count-badge" id="memberCount">1</span>
             </div>
-            <div class="member-list" id="memberList"></div>
-        </div>
-    </div>
 
-    <div class="controls">
-        <button id="toggleBtn" class="btn-cam">
-            <svg id="camIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M23 7l-7 5 7 5V7z"/>
-                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-            </svg>
-            <span id="toggleText">Start Camera</span>
-        </button>
-    </div>
-    <div id="statusMsg"></div>
+            <div class="member-list" id="memberList"></div>
+
+        </aside>
+
+    </main>
+
 </div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script>
-// ================== Elements ==================
-const joinScreen = document.getElementById('joinScreen');
-const roomScreen = document.getElementById('roomScreen');
-const nameInput  = document.getElementById('nameInput');
-const roomInput  = document.getElementById('roomInput');
-const joinBtn    = document.getElementById('joinBtn');
-const errorMsg   = document.getElementById('errorMsg');
-const userAvatar = document.getElementById('userAvatar');
-const userNameLabel = document.getElementById('userNameLabel');
-const roomLabel  = document.getElementById('roomNameLabel');
-const videoGrid  = document.getElementById('videoGrid');
-const memberList = document.getElementById('memberList');
-const memberCount= document.getElementById('memberCount');
-const toggleBtn  = document.getElementById('toggleBtn');
-const toggleText = document.getElementById('toggleText');
-const camIcon    = document.getElementById('camIcon');
-const statusMsg  = document.getElementById('statusMsg');
+<video id="presenceVideo" class="hidden-video" autoplay muted playsinline></video>
 
-// ================== State ==================
-let peer = null, myId = '', userName = '', roomName = '';
-let socket = null, localStream = null, isCamOn = false;
-const connections = new Map(); // peerId → { name, camOn, isMe, tile, video, dot, conn }
-const activeCalls = new Map(); // peerId → call
+<script type="module">
+import {
+    FilesetResolver,
+    FaceDetector
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
 
-// ================== Join form ==================
-function updateJoinBtn() {
-    joinBtn.disabled = !(nameInput.value.trim() && roomInput.value.trim());
+/* =========================================
+   DOM
+========================================= */
+
+const $ = id => document.getElementById(id);
+
+const joinScreen = $("joinScreen");
+const roomScreen = $("roomScreen");
+
+const nameInput = $("nameInput");
+const passwordInput = $("passwordInput");
+const roomInput = $("roomInput");
+const joinBtn = $("joinBtn");
+const errorMsg = $("errorMsg");
+
+const videoGrid = $("videoGrid");
+const memberList = $("memberList");
+const memberCount = $("memberCount");
+
+const toggleBtn = $("toggleBtn");
+const toggleText = $("toggleText");
+const studyBtn = $("studyBtn");
+const studyBtnText = $("studyBtnText");
+
+const studyTimer = $("studyTimer");
+const studyIndicator = $("studyIndicator");
+const studyStateText = $("studyStateText");
+const presenceText = $("presenceText");
+
+const leaderboardList = $("leaderboardList");
+const statusMsg = $("statusMsg");
+const presenceVideo = $("presenceVideo");
+
+/* =========================================
+   STATE
+========================================= */
+
+let peer = null;
+let socket = null;
+
+let myId = "";
+let userId = "";
+let userName = "";
+let roomName = "";
+
+let cameraStream = null;
+let shareStream = null;
+
+let isCamOn = false;
+let isStudying = false;
+let isPresent = false;
+
+let faceDetector = null;
+let detectionLoop = false;
+let lastDetectionTime = 0;
+let lastPresentTime = 0;
+let lastSaveTime = 0;
+
+let selectedPeriod = "today";
+
+const outgoingCalls = new Map();
+const incomingCalls = new Map();
+const remoteMembers = new Map();
+const remoteProfiles = new Map();
+
+let ownStats = {
+    version: 1,
+    days: {}
+};
+
+const STATS_KEY = "focus_hall_stats_";
+const REMOTE_KEY = "focus_hall_remote_profiles";
+
+const PROFILE_SYNC_INTERVAL = 15000;
+
+/* =========================================
+   HELPERS
+========================================= */
+
+function setStatus(message, isError = false) {
+    statusMsg.textContent = message;
+    statusMsg.classList.toggle("error-text", isError);
 }
-nameInput.addEventListener('input', updateJoinBtn);
-roomInput.addEventListener('input', updateJoinBtn);
 
-try {
-    nameInput.value = localStorage.getItem('confName') || '';
-    roomInput.value = localStorage.getItem('confRoom') || '';
-    updateJoinBtn();
-} catch(e) {}
+function escapeText(value) {
+    return String(value ?? "");
+}
 
-// ================== Join ==================
-joinBtn.addEventListener('click', async () => {
-    userName = nameInput.value.trim();
-    roomName = roomInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
-    if (!userName || !roomName) return;
+function formatTime(seconds) {
+    seconds = Math.max(0, Math.floor(seconds || 0));
 
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    return [
+        String(hours).padStart(2, "0"),
+        String(minutes).padStart(2, "0"),
+        String(secs).padStart(2, "0")
+    ].join(":");
+}
+
+function tehranDate(date = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Tehran",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).formatToParts(date);
+
+    const get = type => parts.find(p => p.type === type)?.value;
+
+    return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+function shiftDate(dateString, amount) {
+    const date = new Date(`${dateString}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + amount);
+    return date.toISOString().slice(0, 10);
+}
+
+function getWeekDates() {
+    const today = tehranDate();
+    const date = new Date(`${today}T00:00:00Z`);
+
+    const weekday = date.getUTCDay();
+    const daysSinceMonday = (weekday + 6) % 7;
+
+    const monday = shiftDate(today, -daysSinceMonday);
+
+    const result = [];
+
+    for (let i = 0; i <= daysSinceMonday; i++) {
+        result.push(shiftDate(monday, i));
+    }
+
+    return result;
+}
+
+function getPeriodSeconds(days, period) {
+    if (!days || typeof days !== "object") return 0;
+
+    if (period === "today") {
+        return Number(days[tehranDate()] || 0);
+    }
+
+    if (period === "yesterday") {
+        return Number(days[shiftDate(tehranDate(), -1)] || 0);
+    }
+
+    if (period === "week") {
+        return getWeekDates().reduce(
+            (sum, date) => sum + Number(days[date] || 0),
+            0
+        );
+    }
+
+    return Object.values(days).reduce(
+        (sum, value) => sum + Number(value || 0),
+        0
+    );
+}
+
+async function hashPassword(password) {
+    const data = new TextEncoder().encode(password);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+
+    return Array.from(new Uint8Array(digest))
+        .map(byte => byte.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+function loadOwnStats() {
     try {
-        localStorage.setItem('confName', userName);
-        localStorage.setItem('confRoom', roomName);
-    } catch(e) {}
+        const raw = localStorage.getItem(STATS_KEY + userId);
 
-    joinBtn.disabled = true;
-    joinBtn.textContent = 'Connecting...';
-    errorMsg.textContent = '';
+        if (raw) {
+            const parsed = JSON.parse(raw);
 
-    const myPeerId = `conf-${roomName}-${Math.random().toString(36).substring(2, 10)}`;
+            if (parsed && parsed.days && typeof parsed.days === "object") {
+                ownStats = {
+                    version: 1,
+                    days: parsed.days
+                };
+            }
+        }
+    } catch (error) {
+        console.warn("Could not load local study statistics:", error);
+    }
+}
 
-    peer = new Peer(myPeerId, {
-        debug: 1,
-        config: {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:global.stun.twilio.com:3478' },
-                {
-                    urls: 'turn:openrelay.metered.ca:80',
-                    username: 'openrelayproject',
-                    credential: 'openrelayproject'
+function saveOwnStats() {
+    try {
+        localStorage.setItem(
+            STATS_KEY + userId,
+            JSON.stringify(ownStats)
+        );
+    } catch (error) {
+        console.warn("Could not save study statistics:", error);
+    }
+}
+
+function loadRemoteProfiles() {
+    try {
+        const raw = localStorage.getItem(REMOTE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+
+        if (parsed && typeof parsed === "object") {
+            Object.entries(parsed).forEach(([id, profile]) => {
+                if (id !== userId && profile && profile.data) {
+                    remoteProfiles.set(id, profile);
                 }
-            ]
-        }
-    });
-
-    peer.on('open', (id) => {
-        myId = id;
-        userAvatar.textContent = userName.charAt(0).toUpperCase();
-        userNameLabel.textContent = userName;
-        roomLabel.textContent = roomName;
-        joinScreen.style.display = 'none';
-        roomScreen.classList.add('active');
-
-        addLocalTile();
-        showEmptyHint();
-
-        statusMsg.textContent = 'Connected. Start your camera to share with others.';
-
-        socket = io();
-
-        socket.on('connect', () => {
-            socket.emit('join', { room: roomName, peerId: myId, name: userName });
-        });
-
-        socket.on('others', (list) => {
-            list.forEach(info => {
-                ensureTile(info.peerId, info.name);
-                connectToPeer(info.peerId);
             });
-            hideEmptyHint();
-        });
-
-        socket.on('peer-joined', (info) => {
-            ensureTile(info.peerId, info.name);
-            connectToPeer(info.peerId);
-            if (isCamOn && localStream) setTimeout(() => callPeer(info.peerId), 300);
-            hideEmptyHint();
-        });
-
-        socket.on('peer-left', ({ peerId }) => removeConnection(peerId));
-
-        socket.on('peer-cam-status', ({ peerId, camOn }) => {
-            const entry = connections.get(peerId);
-            if (entry) {
-                entry.camOn = camOn;
-                entry.dot.classList.toggle('on', camOn);
-                updateMemberPanel();
-            }
-        });
-
-        socket.on('member-list', (list) => renderMemberList(list));
-    });
-
-    peer.on('error', (err) => {
-        console.error('Peer error:', err);
-        if (err.type === 'unavailable-id') {
-            errorMsg.textContent = 'This ID is taken. Please refresh the page.';
-        } else if (err.type === 'peer-unavailable') {
-            // user left — ignore
         }
-    });
-
-    peer.on('call', (call) => {
-        const peerId = call.peer;
-        activeCalls.set(peerId, call);
-        call.answer(localStream || null);
-        call.on('stream', (remoteStream) => attachStream(peerId, remoteStream));
-        call.on('close', () => {
-            activeCalls.delete(peerId);
-            const entry = connections.get(peerId);
-            if (entry && !entry.isMe) {
-                entry.video.srcObject = null;
-                entry.tile.classList.remove('has-video');
-                entry.dot.classList.remove('on');
-                entry.camOn = false;
-            }
-        });
-        call.on('error', (e) => console.warn('Call error:', e));
-    });
-
-    peer.on('connection', (conn) => setupDataConn(conn));
-});
-
-// ================== Tiles ==================
-function ensureTile(peerId, name) {
-    if (connections.has(peerId)) {
-        const entry = connections.get(peerId);
-        if (name && entry.name !== name) {
-            entry.name = name;
-            entry.tile.querySelector('.name-text').textContent = name;
-        }
-        return entry;
+    } catch (error) {
+        console.warn("Could not load remote profiles:", error);
     }
-    const { tile, video, dot } = createTile(peerId, name || 'User', false);
-    const entry = { name: name || 'User', isMe: false, camOn: false, tile, video, dot, conn: null };
-    connections.set(peerId, entry);
-    return entry;
 }
 
-function addLocalTile() {
-    const { tile, video, dot } = createTile(myId, userName, true);
-    connections.set(myId, { name: userName, isMe: true, camOn: false, tile, video, dot, conn: null });
-}
-
-function createTile(id, name, isMe) {
-    const tile = document.createElement('div');
-    tile.className = 'video-tile' + (isMe ? ' mirror' : '');
-    tile.id = 'tile-' + id;
-    const initial = (name || '?').charAt(0).toUpperCase();
-    tile.innerHTML = `
-        <video autoplay playsinline ${isMe ? 'muted' : ''}></video>
-        <div class="placeholder">
-            <div class="avatar-lg">${initial}</div>
-            <div class="txt">Camera off</div>
-        </div>
-        <div class="name-tag">
-            <span class="dot"></span>
-            <span class="name-text"></span>
-        </div>
-        ${isMe ? '<div class="you-tag">You</div>' : ''}
-    `;
-    tile.querySelector('.name-text').textContent = name || 'User';
-    videoGrid.appendChild(tile);
-    return { tile, video: tile.querySelector('video'), dot: tile.querySelector('.dot') };
-}
-
-function attachStream(peerId, stream) {
-    const entry = ensureTile(peerId);
-    entry.video.srcObject = stream;
-    entry.tile.classList.add('has-video');
-    entry.dot.classList.add('on');
-    entry.camOn = true;
-    entry.video.play().catch(() => {});
-    updateMemberPanel();
-}
-
-function removeConnection(peerId) {
-    const entry = connections.get(peerId);
-    if (entry) {
-        entry.tile.remove();
-        connections.delete(peerId);
-    }
-    if (activeCalls.has(peerId)) {
-        try { activeCalls.get(peerId).close(); } catch(e) {}
-        activeCalls.delete(peerId);
-    }
-    updateMemberPanel();
-    if (connections.size <= 1) showEmptyHint();
-}
-
-// ================== Camera ==================
-async function startCamera() {
+function saveRemoteProfiles() {
     try {
-        toggleBtn.disabled = true;
-        toggleText.textContent = 'Starting...';
-        statusMsg.textContent = 'Requesting camera access...';
-        statusMsg.classList.remove('error-text');
+        const data = {};
 
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-            audio: false
+        remoteProfiles.forEach((profile, id) => {
+            data[id] = profile;
         });
-        isCamOn = true;
 
-        const me = connections.get(myId);
-        if (me) {
-            me.video.srcObject = localStream;
-            me.tile.classList.add('has-video');
-            me.dot.classList.add('on');
-            me.camOn = true;
-            me.video.play().catch(()=>{});
-        }
-
-        for (const peerId of connections.keys()) {
-            if (peerId === myId) continue;
-            callPeer(peerId);
-        }
-
-        if (socket) socket.emit('cam-status', { camOn: true });
-
-        toggleText.textContent = 'Stop Camera';
-        toggleBtn.classList.add('off');
-        camIcon.innerHTML = '<path d="M1 1l22 22"/><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>';
-        toggleBtn.disabled = false;
-        statusMsg.textContent = 'Camera is live.';
-        updateMemberPanel();
-    } catch (err) {
-        toggleBtn.disabled = false;
-        toggleText.textContent = 'Start Camera';
-        statusMsg.textContent = 'Camera access denied or unavailable.';
-        statusMsg.classList.add('error-text');
-        if (err.name === 'NotAllowedError') statusMsg.textContent = 'Camera permission denied. Check browser settings.';
-        else if (err.name === 'NotFoundError') statusMsg.textContent = 'No camera found on this device.';
-        stopCamera(false);
+        localStorage.setItem(REMOTE_KEY, JSON.stringify(data));
+    } catch (error) {
+        console.warn("Could not save remote profiles:", error);
     }
 }
 
-function stopCamera(updateUI = true) {
-    if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
-        localStream = null;
-    }
-    isCamOn = false;
+function mergeDays(oldDays, newDays) {
+    const merged = { ...(oldDays || {}) };
 
-    const me = connections.get(myId);
-    if (me) {
-        me.video.srcObject = null;
-        me.tile.classList.remove('has-video');
-        me.dot.classList.remove('on');
-        me.camOn = false;
-    }
+    for (const [date, seconds] of Object.entries(newDays || {})) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
 
-    for (const [pid, call] of activeCalls) {
-        try { call.close(); } catch(e) {}
-    }
-    activeCalls.clear();
+        const value = Number(seconds);
 
-    for (const [peerId, entry] of connections) {
-        if (peerId === myId) continue;
-        entry.video.srcObject = null;
-        entry.tile.classList.remove('has-video');
-        entry.dot.classList.remove('on');
-        entry.camOn = false;
+        if (!Number.isFinite(value) || value < 0) continue;
+
+        merged[date] = Math.max(
+            Number(merged[date] || 0),
+            Math.floor(value)
+        );
     }
 
-    if (socket) socket.emit('cam-status', { camOn: false });
-
-    if (updateUI) {
-        toggleText.textContent = 'Start Camera';
-        toggleBtn.classList.remove('off');
-        camIcon.innerHTML = '<path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>';
-        statusMsg.textContent = 'Camera is off.';
-        statusMsg.classList.remove('error-text');
-        updateMemberPanel();
-    }
+    return merged;
 }
 
-toggleBtn.addEventListener('click', () => {
-    isCamOn ? stopCamera() : startCamera();
-});
+/* =========================================
+   PROFILE SYNCHRONIZATION
+========================================= */
 
-// ================== Calls ==================
-function callPeer(peerId) {
-    if (!localStream || !peer || peerId === myId) return;
-    if (activeCalls.has(peerId)) return;
+function sendMyProfile() {
+    if (!socket?.connected || !userId) return;
 
-    const call = peer.call(peerId, localStream);
-    if (!call) return;
-    activeCalls.set(peerId, call);
-    call.on('stream', (remoteStream) => attachStream(peerId, remoteStream));
-    call.on('close', () => {
-        activeCalls.delete(peerId);
-        const entry = connections.get(peerId);
-        if (entry && !entry.isMe) {
-            entry.video.srcObject = null;
-            entry.tile.classList.remove('has-video');
-            entry.dot.classList.remove('on');
-            entry.camOn = false;
+    socket.emit("study-profile", {
+        data: {
+            version: 1,
+            days: ownStats.days
         }
     });
-    call.on('error', (e) => console.warn('Call error:', e));
 }
 
-// ================== DataChannel ==================
-function connectToPeer(peerId) {
-    if (!peer || peerId === myId) return;
-    const entry = connections.get(peerId);
-    if (entry && entry.conn) return;
-    const conn = peer.connect(peerId, { reliable: true });
-    setupDataConn(conn);
-}
+function receiveProfile(payload) {
+    if (!payload || !payload.userId || payload.userId === userId) return;
 
-function setupDataConn(conn) {
-    const peerId = conn.peer;
-    conn.on('open', () => {
-        conn.send({ type: 'name', name: userName });
-        const entry = connections.get(peerId);
-        if (entry) entry.conn = conn;
-    });
-    conn.on('data', (data) => {
-        if (data.type === 'name') {
-            const entry = ensureTile(peerId, data.name);
-            entry.name = data.name;
-            entry.tile.querySelector('.name-text').textContent = data.name;
-            updateMemberPanel();
+    if (!payload.data || typeof payload.data !== "object") return;
+
+    const existing = remoteProfiles.get(payload.userId);
+
+    const mergedDays = mergeDays(
+        existing?.data?.days || {},
+        payload.data.days || {}
+    );
+
+    remoteProfiles.set(payload.userId, {
+        name: payload.name || existing?.name || "Participant",
+        data: {
+            version: 1,
+            days: mergedDays
         }
     });
-    conn.on('close', () => {
-        const entry = connections.get(peerId);
-        if (entry) entry.conn = null;
-    });
+
+    saveRemoteProfiles();
+    renderLeaderboard();
 }
 
-// ================== Members Panel ==================
-function renderMemberList(list) {
-    memberList.innerHTML = '';
-    memberCount.textContent = list.length;
-    list.forEach(m => {
-        const isMe = m.peerId === myId;
-        const item = document.createElement('div');
-        item.className = 'member-item' + (isMe ? ' me' : '');
-        item.innerHTML = `
-            <div class="member-avatar">${(m.name || '?').charAt(0).toUpperCase()}</div>
-            <div class="member-name">${m.name || 'User'}${isMe ? '<span class="you-label">(you)</span>' : ''}</div>
-            <div class="member-status ${m.camOn ? 'cam-on' : ''}"></div>
-        `;
+function answerProfileRequest() {
+    sendMyProfile();
+}
+
+/* =========================================
+   VIDEO TILE
+========================================= */
+
+function createVideoTile(id, name, isMe = false) {
+    let tile = document.getElementById(`tile-${id}`);
+
+    if (tile) return tile;
+
+    tile = document.createElement("div");
+    tile.className = "video-tile";
+    tile.id = `tile-${id}`;
+
+    const placeholder = document.createElement("div");
+    placeholder.className = "placeholder";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar-lg";
+    avatar.textContent = name.charAt(0).toUpperCase() || "?";
+
+    const placeholderText = document.createElement("div");
+    placeholderText.className = "txt";
+    placeholderText.textContent = "Camera is off";
+
+    placeholder.append(avatar, placeholderText);
+
+    const video = document.createElement("video");
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = isMe;
+
+    const nameTag = document.createElement("div");
+    nameTag.className = "name-tag";
+
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    dot.id = `dot-${id}`;
+
+    const nameText = document.createElement("span");
+    nameText.className = "name-text";
+    nameText.textContent = isMe ? `${name} (You)` : name;
+
+    nameTag.append(dot, nameText);
+
+    tile.append(placeholder, video, nameTag);
+
+    if (isMe) {
+        const youTag = document.createElement("div");
+        youTag.className = "you-tag";
+        youTag.textContent = "YOU";
+        tile.appendChild(youTag);
+        tile.classList.add("mirror");
+    }
+
+    videoGrid.appendChild(tile);
+
+    return tile;
+}
+
+function setTileStream(id, stream) {
+    const tile = document.getElementById(`tile-${id}`);
+    if (!tile) return;
+
+    const video = tile.querySelector("video");
+
+    if (!stream) {
+        video.srcObject = null;
+        tile.classList.remove("has-video");
+        return;
+    }
+
+    video.srcObject = stream;
+    video.play().catch(() => {});
+    tile.classList.add("has-video");
+}
+
+function removeVideoTile(id) {
+    const tile = document.getElementById(`tile-${id}`);
+    if (tile) tile.remove();
+}
+
+/* =========================================
+   MEMBER LIST
+========================================= */
+
+function renderMembers() {
+    const members = [];
+
+    members.push({
+        peerId: myId,
+        userId,
+        name: userName,
+        camOn: isCamOn,
+        studying: isStudying,
+        me: true
+    });
+
+    remoteMembers.forEach(member => {
+        members.push({
+            ...member,
+            me: false
+        });
+    });
+
+    memberCount.textContent = String(members.length);
+    memberList.replaceChildren();
+
+    members.forEach(member => {
+        const item = document.createElement("div");
+        item.className = "member-item" + (member.me ? " me" : "");
+
+        const avatar = document.createElement("div");
+        avatar.className = "member-avatar";
+        avatar.textContent = (member.name || "?").charAt(0).toUpperCase();
+
+        const name = document.createElement("div");
+        name.className = "member-name";
+        name.textContent = member.name || "Participant";
+
+        if (member.me) {
+            const you = document.createElement("span");
+            you.className = "you-label";
+            you.textContent = " YOU";
+            name.appendChild(you);
+        }
+
+        const status = document.createElement("span");
+        status.className = "member-status" + (member.camOn ? " cam-on" : "");
+
+        item.append(avatar, name);
+
+        if (member.studying) {
+            const study = document.createElement("span");
+            study.className = "member-study";
+            study.textContent = "STUDY";
+            item.appendChild(study);
+        }
+
+        item.appendChild(status);
         memberList.appendChild(item);
     });
 }
 
-function updateMemberPanel() {
-    const list = [];
-    for (const [peerId, entry] of connections) {
-        list.push({ peerId, name: entry.name, camOn: entry.camOn });
+/* =========================================
+   LEADERBOARD
+========================================= */
+
+function renderLeaderboard() {
+    const participants = [];
+
+    participants.push({
+        id: userId,
+        name: userName,
+        days: ownStats.days
+    });
+
+    remoteProfiles.forEach((profile, id) => {
+        const member = remoteMembers.get(id);
+
+        participants.push({
+            id,
+            name: member?.name || profile.name || "Participant",
+            days: profile.data?.days || {}
+        });
+    });
+
+    const ranked = participants
+        .map(person => ({
+            ...person,
+            seconds: getPeriodSeconds(person.days, selectedPeriod)
+        }))
+        .sort((a, b) => b.seconds - a.seconds);
+
+    leaderboardList.replaceChildren();
+
+    if (!ranked.length || ranked.every(person => person.seconds === 0)) {
+        const empty = document.createElement("div");
+        empty.className = "empty-leaderboard";
+        empty.textContent = "No study time recorded for this period yet.";
+        leaderboardList.appendChild(empty);
+        return;
     }
-    renderMemberList(list);
+
+    ranked.forEach((person, index) => {
+        const row = document.createElement("div");
+        row.className = "leaderboard-item";
+
+        const rank = document.createElement("div");
+        rank.className = "leaderboard-rank";
+        rank.textContent = String(index + 1);
+
+        const name = document.createElement("div");
+        name.className = "leaderboard-name";
+        name.textContent = person.name;
+
+        const time = document.createElement("div");
+        time.className = "leaderboard-time";
+        time.textContent = formatTime(person.seconds);
+
+        row.append(rank, name, time);
+        leaderboardList.appendChild(row);
+    });
 }
 
-// ================== Empty hint ==================
-function showEmptyHint() {
-    if (connections.size <= 1 && !document.getElementById('emptyHint')) {
-        const el = document.createElement('div');
-        el.id = 'emptyHint';
-        el.className = 'empty-state';
-        el.innerHTML = '<div class="icon">👥</div><p>Waiting for others to join...</p>';
-        videoGrid.appendChild(el);
+document.querySelectorAll(".period-tab").forEach(button => {
+    button.addEventListener("click", () => {
+        document.querySelectorAll(".period-tab").forEach(item => {
+            item.classList.remove("active");
+        });
+
+        button.classList.add("active");
+        selectedPeriod = button.dataset.period;
+        renderLeaderboard();
+    });
+});
+
+/* =========================================
+   CAMERA CAPTURE
+========================================= */
+
+async function ensureCameraStream() {
+    if (cameraStream && cameraStream.getVideoTracks().some(t => t.readyState === "live")) {
+        return cameraStream;
     }
-}
-function hideEmptyHint() {
-    const el = document.getElementById('emptyHint');
-    if (el) el.remove();
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera access is unavailable. Use HTTPS or localhost.");
+    }
+
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+            width: { ideal: 320 },
+            height: { ideal: 240 },
+            frameRate: { ideal: 10, max: 15 },
+            facingMode: "user"
+        }
+    });
+
+    presenceVideo.srcObject = cameraStream;
+
+    await presenceVideo.play().catch(() => {});
+
+    return cameraStream;
 }
 
-// ================== Leave ==================
-window.addEventListener('beforeunload', () => {
-    stopCamera(false);
+function releaseCameraIfUnused() {
+    if (isStudying || isCamOn) return;
+
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+
+    presenceVideo.srcObject = null;
+}
+
+/* =========================================
+   CAMERA SHARING
+========================================= */
+
+function updateCameraButton() {
+    toggleBtn.classList.toggle("active", isCamOn);
+    toggleText.textContent = isCamOn ? "Stop Sharing Camera" : "Share Camera";
+}
+
+function updateMyCameraStatus() {
+    if (socket?.connected) {
+        socket.emit("cam-status", {
+            camOn: isCamOn
+        });
+    }
+
+    renderMembers();
+}
+
+async function startCameraSharing() {
+    try {
+        await ensureCameraStream();
+
+        const tracks = cameraStream.getVideoTracks()
+            .filter(track => track.readyState === "live")
+            .map(track => track.clone());
+
+        if (!tracks.length) {
+            throw new Error("No active camera track was found.");
+        }
+
+        shareStream = new MediaStream(tracks);
+        isCamOn = true;
+
+        createVideoTile(myId, userName, true);
+        setTileStream(myId, shareStream);
+
+        updateCameraButton();
+        updateMyCameraStatus();
+
+        for (const member of remoteMembers.values()) {
+            callPeer(member.peerId);
+        }
+
+        setStatus("Your camera is now being shared.");
+    } catch (error) {
+        console.error(error);
+        setStatus(error.message || "Could not start camera sharing.", true);
+    }
+}
+
+function stopCameraSharing() {
+    isCamOn = false;
+
+    if (shareStream) {
+        shareStream.getTracks().forEach(track => track.stop());
+        shareStream = null;
+    }
+
+    outgoingCalls.forEach(call => {
+        try { call.close(); } catch {}
+    });
+
+    outgoingCalls.clear();
+
+    setTileStream(myId, null);
+
+    updateCameraButton();
+    updateMyCameraStatus();
+
+    releaseCameraIfUnused();
+
+    setStatus("Camera sharing stopped. Your study session can continue.");
+}
+
+toggleBtn.addEventListener("click", async () => {
+    if (!isCamOn) {
+        await startCameraSharing();
+    } else {
+        stopCameraSharing();
+    }
+});
+
+/* =========================================
+   PEERJS
+========================================= */
+
+function callPeer(remotePeerId) {
+    if (!peer || !shareStream || !remotePeerId || remotePeerId === myId) return;
+    if (outgoingCalls.has(remotePeerId)) return;
+
+    try {
+        const call = peer.call(remotePeerId, shareStream);
+
+        if (!call) return;
+
+        outgoingCalls.set(remotePeerId, call);
+
+        call.on("close", () => {
+            if (outgoingCalls.get(remotePeerId) === call) {
+                outgoingCalls.delete(remotePeerId);
+            }
+        });
+
+        call.on("error", error => {
+            console.warn("Outgoing call error:", error);
+            outgoingCalls.delete(remotePeerId);
+        });
+
+    } catch (error) {
+        console.warn("Could not call peer:", error);
+    }
+}
+
+function handleIncomingCall(call) {
+    const remotePeerId = call.peer;
+
+    try {
+        call.answer(shareStream || undefined);
+        incomingCalls.set(remotePeerId, call);
+
+        call.on("stream", stream => {
+            setTileStream(remotePeerId, stream);
+        });
+
+        call.on("close", () => {
+            if (incomingCalls.get(remotePeerId) === call) {
+                incomingCalls.delete(remotePeerId);
+            }
+
+            setTileStream(remotePeerId, null);
+        });
+
+        call.on("error", error => {
+            console.warn("Incoming call error:", error);
+        });
+
+    } catch (error) {
+        console.error("Could not answer call:", error);
+    }
+}
+
+function removePeer(peerId) {
+    const outgoing = outgoingCalls.get(peerId);
+    const incoming = incomingCalls.get(peerId);
+
+    try { outgoing?.close(); } catch {}
+    try { incoming?.close(); } catch {}
+
+    outgoingCalls.delete(peerId);
+    incomingCalls.delete(peerId);
+
+    removeVideoTile(peerId);
+}
+
+/* =========================================
+   SOCKET.IO
+========================================= */
+
+function setupSocket() {
+    socket = io({
+        transports: ["websocket"]
+    });
+
+    socket.on("connect", () => {
+        socket.emit("join", {
+            room: roomName,
+            peerId: myId,
+            userId,
+            name: userName
+        });
+    });
+
+    socket.on("connect_error", error => {
+        console.error("Socket connection error:", error);
+        setStatus("Could not connect to the room server.", true);
+    });
+
+    socket.on("join-error", payload => {
+        setStatus(payload?.message || "Could not join the room.", true);
+    });
+
+    socket.on("others", others => {
+        if (!Array.isArray(others)) return;
+
+        others.forEach(member => {
+            if (!member?.peerId || member.peerId === myId) return;
+
+            remoteMembers.set(member.userId || member.peerId, {
+                ...member,
+                userId: member.userId || member.peerId
+            });
+
+            createVideoTile(member.peerId, member.name || "Participant");
+
+            if (isCamOn) {
+                callPeer(member.peerId);
+            }
+        });
+
+        renderMembers();
+        renderLeaderboard();
+    });
+
+    socket.on("peer-joined", member => {
+        if (!member?.peerId || member.peerId === myId) return;
+
+        remoteMembers.set(member.userId || member.peerId, {
+            ...member,
+            userId: member.userId || member.peerId
+        });
+
+        createVideoTile(member.peerId, member.name || "Participant");
+
+        if (isCamOn) {
+            callPeer(member.peerId);
+        }
+
+        renderMembers();
+        renderLeaderboard();
+    });
+
+    socket.on("peer-left", member => {
+        if (!member) return;
+
+        removePeer(member.peerId);
+
+        if (member.userId) {
+            remoteMembers.delete(member.userId);
+        }
+
+        renderMembers();
+        renderLeaderboard();
+    });
+
+    socket.on("peer-cam-status", payload => {
+        if (!payload) return;
+
+        const member = [...remoteMembers.values()]
+            .find(item => item.peerId === payload.peerId);
+
+        if (member) {
+            member.camOn = payload.camOn === true;
+        }
+
+        const dot = document.getElementById(`dot-${payload.peerId}`);
+
+        if (dot) {
+            dot.classList.toggle("on", payload.camOn === true);
+        }
+
+        renderMembers();
+    });
+
+    socket.on("peer-study-status", payload => {
+        if (!payload) return;
+
+        const member = remoteMembers.get(payload.userId);
+
+        if (member) {
+            member.studying = payload.studying === true;
+        }
+
+        renderMembers();
+    });
+
+    socket.on("member-list", members => {
+        if (!Array.isArray(members)) return;
+
+        members.forEach(member => {
+            if (!member?.userId || member.userId === userId) return;
+
+            const old = remoteMembers.get(member.userId) || {};
+
+            remoteMembers.set(member.userId, {
+                ...old,
+                ...member
+            });
+
+            if (member.peerId) {
+                createVideoTile(member.peerId, member.name || "Participant");
+            }
+        });
+
+        const activeIds = new Set(
+            members
+                .filter(member => member.userId !== userId)
+                .map(member => member.userId)
+        );
+
+        for (const id of remoteMembers.keys()) {
+            if (!activeIds.has(id)) {
+                const member = remoteMembers.get(id);
+                if (member?.peerId) removePeer(member.peerId);
+                remoteMembers.delete(id);
+            }
+        }
+
+        renderMembers();
+        renderLeaderboard();
+    });
+
+    socket.on("study-profile-request", () => {
+        answerProfileRequest();
+    });
+
+    socket.on("study-profile", payload => {
+        receiveProfile(payload);
+    });
+}
+
+/* =========================================
+   MEDIAPIPE PRESENCE DETECTION
+========================================= */
+
+async function initializeFaceDetector() {
+    if (faceDetector) return faceDetector;
+
+    const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+    );
+
+    faceDetector = await FaceDetector.createFromOptions(vision, {
+        baseOptions: {
+            modelAssetPath:
+                "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+            delegate: "CPU"
+        },
+        runningMode: "VIDEO",
+        minDetectionConfidence: 0.55
+    });
+
+    return faceDetector;
+}
+
+function addStudySeconds(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return;
+
+    const today = tehranDate();
+
+    ownStats.days[today] = Math.floor(
+        Number(ownStats.days[today] || 0) + seconds
+    );
+
+    studyTimer.textContent = formatTime(
+        getPeriodSeconds(ownStats.days, "all")
+    );
+
+    renderLeaderboard();
+}
+
+async function detectionTick() {
+    if (!detectionLoop || !isStudying) return;
+
+    if (document.visibilityState !== "visible") {
+        isPresent = false;
+        lastPresentTime = 0;
+        presenceText.textContent = "Paused while this tab is hidden";
+        setTimeout(detectionTick, 700);
+        return;
+    }
+
+    if (!faceDetector || presenceVideo.readyState < 2) {
+        setTimeout(detectionTick, 500);
+        return;
+    }
+
+    const now = performance.now();
+
+    try {
+        const result = faceDetector.detectForVideo(
+            presenceVideo,
+            now
+        );
+
+        const detected = Boolean(
+            result?.detections && result.detections.length > 0
+        );
+
+        isPresent = detected;
+
+        if (detected) {
+            if (lastPresentTime > 0) {
+                const elapsed = Math.min(
+                    (now - lastPresentTime) / 1000,
+                    1.2
+                );
+
+                addStudySeconds(elapsed);
+            }
+
+            lastPresentTime = now;
+            presenceText.textContent = "You are present · Time is being recorded";
+        } else {
+            lastPresentTime = 0;
+            presenceText.textContent = "Waiting for your presence...";
+        }
+
+        studyIndicator.classList.toggle("active", detected);
+
+        if (Date.now() - lastSaveTime > 5000) {
+            saveOwnStats();
+            sendMyProfile();
+            lastSaveTime = Date.now();
+        }
+
+    } catch (error) {
+        console.warn("Presence detection error:", error);
+        presenceText.textContent = "Presence detection temporarily unavailable";
+        lastPresentTime = 0;
+    }
+
+    setTimeout(detectionTick, 500);
+}
+
+async function startPresenceDetection() {
+    await ensureCameraStream();
+    await initializeFaceDetector();
+
+    detectionLoop = true;
+    lastPresentTime = 0;
+
+    presenceText.textContent = "Camera is ready. Detecting your presence...";
+
+    detectionTick();
+}
+
+function stopPresenceDetection() {
+    detectionLoop = false;
+    isPresent = false;
+    lastPresentTime = 0;
+
+    studyIndicator.classList.remove("active");
+
+    if (faceDetector) {
+        try {
+            faceDetector.close();
+        } catch {}
+
+        faceDetector = null;
+    }
+
+    releaseCameraIfUnused();
+}
+
+/* =========================================
+   STUDY SESSION
+========================================= */
+
+function updateStudyUI() {
+    studyBtn.classList.toggle("active", isStudying);
+    studyBtnText.textContent = isStudying
+        ? "Stop Studying"
+        : "Start Studying";
+
+    studyIndicator.classList.toggle("active", isPresent);
+
+    studyStateText.textContent = isStudying
+        ? "Study session active"
+        : "Study session inactive";
+
+    renderMembers();
+}
+
+async function startStudy() {
+    studyBtn.disabled = true;
+    studyBtnText.textContent = "Starting...";
+
+    try {
+        await startPresenceDetection();
+
+        isStudying = true;
+        updateStudyUI();
+
+        if (socket?.connected) {
+            socket.emit("study-status", {
+                studying: true
+            });
+        }
+
+        setStatus("Study session started. Presence detection is active.");
+
+    } catch (error) {
+        console.error(error);
+
+        detectionLoop = false;
+        isStudying = false;
+
+        releaseCameraIfUnused();
+
+        studyStateText.textContent = "Could not start study session";
+        presenceText.textContent = error.message || "Camera or detection initialization failed.";
+
+        setStatus(
+            "Could not start presence detection. Check camera permission and connection.",
+            true
+        );
+    } finally {
+        studyBtn.disabled = false;
+        updateStudyUI();
+    }
+}
+
+function stopStudy() {
+    isStudying = false;
+
+    stopPresenceDetection();
+
+    saveOwnStats();
+    sendMyProfile();
+
+    if (socket?.connected) {
+        socket.emit("study-status", {
+            studying: false
+        });
+    }
+
+    updateStudyUI();
+
+    presenceText.textContent = "Study session stopped.";
+    setStatus("Your study session has ended.");
+}
+
+studyBtn.addEventListener("click", async () => {
+    if (!isStudying) {
+        await startStudy();
+    } else {
+        stopStudy();
+    }
+});
+
+/* =========================================
+   JOIN
+========================================= */
+
+function validateInputs() {
+    const name = nameInput.value.trim();
+    const password = passwordInput.value;
+    const room = roomInput.value.trim();
+
+    if (!name) {
+        errorMsg.textContent = "Please enter your name.";
+        return false;
+    }
+
+    if (password.length < 8) {
+        errorMsg.textContent = "Password must contain at least 8 characters.";
+        return false;
+    }
+
+    if (!room) {
+        errorMsg.textContent = "Please enter a room code.";
+        return false;
+    }
+
+    if (!/^[a-zA-Z0-9_-]{1,40}$/.test(room)) {
+        errorMsg.textContent = "Room code can only contain letters, numbers, _ and -.";
+        return false;
+    }
+
+    errorMsg.textContent = "";
+    return true;
+}
+
+joinBtn.addEventListener("click", joinRoom);
+
+[nameInput, passwordInput, roomInput].forEach(input => {
+    input.addEventListener("keydown", event => {
+        if (event.key === "Enter") joinRoom();
+    });
+});
+
+async function joinRoom() {
+    if (!validateInputs()) return;
+
+    joinBtn.disabled = true;
+    joinBtn.textContent = "Connecting...";
+
+    try {
+        userName = nameInput.value.trim().slice(0, 30);
+        roomName = roomInput.value.trim();
+
+        userId = await hashPassword(passwordInput.value);
+
+        // The raw password is not stored.
+        passwordInput.value = "";
+
+        loadOwnStats();
+        loadRemoteProfiles();
+
+        peer = new Peer(
+            `conf-${roomName}-${crypto.randomUUID()}`,
+            {
+                config: {
+                    iceServers: [
+                        { urls: "stun:stun.l.google.com:19302" },
+                        {
+                            urls: "turn:openrelay.metered.ca:80",
+                            username: "openrelayproject",
+                            credential: "openrelayproject"
+                        },
+                        {
+                            urls: "turn:openrelay.metered.ca:443",
+                            username: "openrelayproject",
+                            credential: "openrelayproject"
+                        }
+                    ]
+                }
+            }
+        );
+
+        peer.on("open", id => {
+            myId = id;
+
+            $("roomNameLabel").textContent = roomName;
+            $("userNameLabel").textContent = userName;
+            $("userAvatar").textContent = userName.charAt(0).toUpperCase();
+
+            joinScreen.style.display = "none";
+            roomScreen.classList.add("active");
+
+            createVideoTile(myId, userName, true);
+
+            studyTimer.textContent = formatTime(
+                getPeriodSeconds(ownStats.days, "all")
+            );
+
+            renderMembers();
+            renderLeaderboard();
+
+            setupSocket();
+
+            setStatus("Connected. Welcome to your study room.");
+        });
+
+        peer.on("call", handleIncomingCall);
+
+        peer.on("error", error => {
+            console.error("PeerJS error:", error);
+            setStatus("Peer connection error: " + error.type, true);
+        });
+
+    } catch (error) {
+        console.error(error);
+
+        errorMsg.textContent =
+            error.message || "Could not initialize your account.";
+
+        joinBtn.disabled = false;
+        joinBtn.textContent = "Join Study Room";
+    }
+}
+
+/* =========================================
+   VISIBILITY & PERIODIC SYNC
+========================================= */
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") {
+        lastPresentTime = 0;
+        isPresent = false;
+        studyIndicator.classList.remove("active");
+
+        if (isStudying) {
+            presenceText.textContent = "Paused while this tab is hidden";
+        }
+    }
+});
+
+setInterval(() => {
+    if (!userId) return;
+
+    saveOwnStats();
+    sendMyProfile();
+}, PROFILE_SYNC_INTERVAL);
+
+/* =========================================
+   CLEANUP
+========================================= */
+
+window.addEventListener("beforeunload", () => {
+    saveOwnStats();
+
+    if (isStudying && socket?.connected) {
+        socket.emit("study-status", {
+            studying: false
+        });
+    }
+
     if (socket) socket.disconnect();
-    if (peer) { try { peer.destroy(); } catch(e) {} }
+
+    if (shareStream) {
+        shareStream.getTracks().forEach(track => track.stop());
+    }
+
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+    }
+
+    if (peer) peer.destroy();
 });
 </script>
+
 </body>
 </html>
