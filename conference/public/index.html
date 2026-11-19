@@ -2806,78 +2806,100 @@
            CANVAS ENHANCEMENT (بدون مصرف اینترنت اضافی)
         ========================================= */
 
-        function startEnhancement(tile, video, peerId) {
-            if (!ENHANCEMENT_ENABLED) return;
-            if (enhancementMap.has(peerId)) return;
+function startEnhancement(tile, video, peerId) {
+    if (!ENHANCEMENT_ENABLED) return;
+    if (enhancementMap.has(peerId)) return;
 
-            const canvas = document.createElement("canvas");
-            canvas.className = "enhanced-video";
-            tile.appendChild(canvas);
+    const canvas = document.createElement("canvas");
+    canvas.className = "enhanced-video";
+    tile.appendChild(canvas);
 
-            const ctx = canvas.getContext("2d", { alpha: false });
-            const scratch = document.createElement("canvas");
-            const scratchCtx = scratch.getContext("2d", { willReadFrequently: true });
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) { canvas.remove(); return; }
 
-            const state = { canvas, ctx, scratch, scratchCtx, video, raf: 0, lastDraw: 0 };
-            enhancementMap.set(peerId, state);
-            tile.classList.add("enhanced");
+    const scratch = document.createElement("canvas");
+    const scratchCtx = scratch.getContext("2d", { willReadFrequently: true });
+    if (!scratchCtx) { canvas.remove(); return; }
 
-            const render = (now) => {
-                if (!enhancementMap.has(peerId)) return;
+    const state = {
+        canvas, ctx, scratch, scratchCtx, video,
+        raf: 0, lastDraw: 0,
+        firstFrameDrawn: false,
+        failures: 0
+    };
+    enhancementMap.set(peerId, state);
+    // ❌ tile.classList.add("enhanced") را اینجا نگذارید
 
-                if (video.readyState >= 2 && now - state.lastDraw >= 200) {
-                    state.lastDraw = now;
+    const render = (now) => {
+        if (!enhancementMap.has(peerId)) return;
 
-                    const w = VIDEO_SEND_PROFILE.width;
-                    const h = VIDEO_SEND_PROFILE.height;
+        if (video.readyState >= 2 && video.videoWidth > 0 && now - state.lastDraw >= 200) {
+            state.lastDraw = now;
 
-                    if (scratch.width !== w) {
-                        scratch.width = w;
-                        scratch.height = h;
-                        canvas.width = w * 2;
-                        canvas.height = h * 2;
-                    }
+            const w = video.videoWidth;
+            const h = video.videoHeight;
+            if (w < 3 || h < 3) { state.raf = requestAnimationFrame(render); return; }
 
-                    try {
-                        state.scratchCtx.drawImage(video, 0, 0, w, h);
-                        const frame = state.scratchCtx.getImageData(0, 0, w, h);
-                        const src = frame.data;
-                        const dst = new Uint8ClampedArray(src);
-                        const k = [0, -0.15, 0, -0.15, 1.6, -0.15, 0, -0.15, 0];
-
-                        for (let y = 1; y < h - 1; y++) {
-                            for (let x = 1; x < w - 1; x++) {
-                                const i = (y * w + x) * 4;
-                                for (let c = 0; c < 3; c++) {
-                                    let v = 0, kk = 0;
-                                    for (let dy = -1; dy <= 1; dy++) {
-                                        for (let dx = -1; dx <= 1; dx++) {
-                                            const p = ((y + dy) * w + (x + dx)) * 4 + c;
-                                            v += src[p] * k[kk++];
-                                        }
-                                    }
-                                    dst[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
-                                }
-                            }
-                        }
-                        frame.data.set(dst);
-                        state.scratchCtx.putImageData(frame, 0, 0);
-
-                        ctx.imageSmoothingEnabled = true;
-                        ctx.imageSmoothingQuality = "high";
-                        ctx.drawImage(scratch, 0, 0, canvas.width, canvas.height);
-                    } catch (e) {
-                        stopEnhancement(peerId);
-                        return;
-                    }
+            try {
+                if (scratch.width !== w) {
+                    scratch.width = w;
+                    scratch.height = h;
+                    canvas.width = w * 2;
+                    canvas.height = h * 2;
                 }
 
-                state.raf = requestAnimationFrame(render);
-            };
+                scratchCtx.drawImage(video, 0, 0, w, h);
+                const frame = scratchCtx.getImageData(0, 0, w, h);
+                const src = frame.data;
 
-            state.raf = requestAnimationFrame(render);
+                // فریم کاملاً سیاه را منتشر نکن
+                let nonBlack = 0;
+                for (let i = 0; i < src.length; i += 4 * 97) {
+                    if (src[i] || src[i + 1] || src[i + 2]) nonBlack++;
+                }
+                if (nonBlack === 0) { state.raf = requestAnimationFrame(render); return; }
+
+                const dst = new Uint8ClampedArray(src);
+                const k = [0, -0.15, 0, -0.15, 1.6, -0.15, 0, -0.15, 0];
+                for (let y = 1; y < h - 1; y++) {
+                    for (let x = 1; x < w - 1; x++) {
+                        const i = (y * w + x) * 4;
+                        for (let c = 0; c < 3; c++) {
+                            let v = 0, kk = 0;
+                            for (let dy = -1; dy <= 1; dy++) {
+                                for (let dx = -1; dx <= 1; dx++) {
+                                    const p = ((y + dy) * w + (x + dx)) * 4 + c;
+                                    v += src[p] * k[kk++];
+                                }
+                            }
+                            dst[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
+                        }
+                    }
+                }
+                frame.data.set(dst);
+                scratchCtx.putImageData(frame, 0, 0);
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = "high";
+                ctx.drawImage(scratch, 0, 0, canvas.width, canvas.height);
+
+                // فقط الان ویدیوی اصلی را مخفی کن
+                if (!state.firstFrameDrawn) {
+                    state.firstFrameDrawn = true;
+                    tile.classList.add("enhanced");
+                }
+                state.failures = 0;
+            } catch (e) {
+                state.failures++;
+                if (state.failures >= 3) { stopEnhancement(peerId); return; }
+            }
         }
 
+        state.raf = requestAnimationFrame(render);
+    };
+
+    state.raf = requestAnimationFrame(render);
+}
         function stopEnhancement(peerId) {
             const state = enhancementMap.get(peerId);
             if (!state) return;
@@ -2888,6 +2910,18 @@
             const tile = document.getElementById(`tile-${peerId}`);
             if (tile) tile.classList.remove("enhanced");
         }
+
+        document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        enhancementMap.forEach(state => {
+            if (state.raf) cancelAnimationFrame(state.raf);
+            state.raf = 0;
+        });
+    } else {
+        // بعد از برگشت تب، enhancement‌های مرده را پاک کن؛ با آمدن stream بعدی دوباره ساخته می‌شوند
+        [...enhancementMap.keys()].forEach(id => stopEnhancement(id));
+    }
+});
 
         /* =========================================
            VIDEO TILE
@@ -2917,7 +2951,7 @@
             const video = document.createElement("video");
             video.autoplay = true;
             video.playsInline = true;
-            video.muted = isMe;
+            video.muted = true;
 
             const nameTag = document.createElement("div");
             nameTag.className = "name-tag";
@@ -2954,6 +2988,13 @@
             }
 
             videoGrid.appendChild(tile);
+            videoGrid.appendChild(tile);
+
+const buffered = pendingStreams.get(id);
+if (buffered) { setTileStream(id, buffered); pendingStreams.delete(id); }
+
+updateTileStudyTimes();
+return tile;
             updateTileStudyTimes();
             return tile;
         }
@@ -3012,35 +3053,49 @@
         }
 
         function setTileStream(id, stream) {
-            const tile = document.getElementById(`tile-${id}`);
-            if (!tile) return;
+    const tile = document.getElementById(`tile-${id}`);
+    if (!tile) {
+        if (stream) pendingStreams.set(id, stream);
+        else pendingStreams.delete(id);
+        return;
+    }
+    pendingStreams.delete(id);
 
-            const video = tile.querySelector("video");
+    const video = tile.querySelector("video");
 
-            if (!stream) {
-                stopEnhancement(id);
-                video.srcObject = null;
-                tile.classList.remove("has-video");
-                return;
-            }
+    if (!stream) {
+        stopEnhancement(id);
+        video.srcObject = null;
+        tile.classList.remove("has-video");
+        return;
+    }
 
-            const hasLiveVideo = stream.getVideoTracks().some(t => t.readyState === "live");
-            if (!hasLiveVideo) {
-                stopEnhancement(id);
-                video.srcObject = null;
-                tile.classList.remove("has-video");
-                return;
-            }
-
-            video.srcObject = stream;
-            video.play().catch(() => { });
-            tile.classList.add("has-video");
-
-            const isLocal = (id === myId || String(id).startsWith("screen-"));
-            if (!isLocal) {
-                startEnhancement(tile, video, id);
-            }
+    // گارد hasLiveVideo را فقط برای وبکم نگه دارید، نه screen
+    if (!String(id).startsWith("screen-")) {
+        const hasLiveVideo = stream.getVideoTracks().some(t => t.readyState === "live");
+        if (!hasLiveVideo) {
+            stopEnhancement(id);
+            video.srcObject = null;
+            tile.classList.remove("has-video");
+            return;
         }
+    }
+
+    video.srcObject = stream;
+    video.play().catch(() => {
+        const resume = () => {
+            video.play().catch(() => {});
+            window.removeEventListener("pointerdown", resume);
+        };
+        window.addEventListener("pointerdown", resume, { once: true });
+    });
+    tile.classList.add("has-video");
+
+    const isLocal = (id === myId || String(id).startsWith("screen-"));
+    if (!isLocal) {
+        startEnhancement(tile, video, id);
+    }
+}
 
         function removeVideoTile(id) {
             stopEnhancement(id);
@@ -3345,8 +3400,23 @@
                 updateMyCameraStatus();
 
                 for (const member of remoteMembers.values()) {
-                    if (member.peerId) callPeer(member.peerId);
-                }
+    if (!member.peerId) continue;
+    const existing = outgoingCalls.get(member.peerId);
+    if (existing) {
+        try {
+            const sender = existing.peerConnection
+                .getSenders()
+                .find(s => s.track && s.track.kind === "video");
+            if (sender) {
+                await sender.replaceTrack(shareStream.getVideoTracks()[0]);
+                continue;
+            }
+        } catch {}
+        try { existing.close(); } catch {}
+        outgoingCalls.delete(member.peerId);
+    }
+    callPeer(member.peerId);
+}
 
                 setStatus("Camera sharing started (low-data mode: 160×90, 1 fps).");
             } catch (error) {
@@ -3397,8 +3467,23 @@
                 setTileStream(`screen-${myId}`, screenStream);
                 updateScreenShareButton();
                 for (const member of remoteMembers.values()) {
-                    if (member.peerId) callScreenPeer(member.peerId);
-                }
+    if (!member.peerId) continue;
+    const existing = outgoingScreenCalls.get(member.peerId);
+    if (existing) {
+        try {
+            const sender = existing.peerConnection
+                .getSenders()
+                .find(s => s.track && s.track.kind === "video");
+            if (sender) {
+                await sender.replaceTrack(screenStream.getVideoTracks()[0]);
+                continue;
+            }
+        } catch {}
+        try { existing.close(); } catch {}
+        outgoingScreenCalls.delete(member.peerId);
+    }
+    callScreenPeer(member.peerId);
+}
                 track.addEventListener("ended", stopScreenSharing, { once: true });
                 setStatus("Your screen is now being shared with the room.");
             } catch (error) {
@@ -3502,7 +3587,7 @@
                 call.answer(isScreenCall ? undefined : (shareStream || undefined));
                 const targetMap = isScreenCall ? incomingScreenCalls : incomingCalls;
                 targetMap.set(remotePeerId, call);
-                applyBitrateCap(call);
+applyBitrateCap(call, isScreenCall ? SCREEN_SEND_PROFILE : VIDEO_SEND_PROFILE);
 
                 call.on("stream", stream => {
                     if (isScreenCall) {
@@ -4145,21 +4230,21 @@
                         secure: true,
                         path: "/peerjs",
                         config: {
-                            iceServers: [
-                                { urls: "stun:stun.l.google.com:19302" },
-                                { urls: "stun:stun1.l.google.com:19302" },
-                                {
-                                    urls: "turn:openrelay.metered.ca:80",
-                                    username: "openrelayproject",
-                                    credential: "openrelayproject"
-                                },
-                                {
-                                    urls: "turn:openrelay.metered.ca:443",
-                                    username: "openrelayproject",
-                                    credential: "openrelayproject"
-                                }
-                            ]
-                        }
+    iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        {
+            urls: "turn:YOUR_TURN_HOST:3478",
+            username: "YOUR_USER",
+            credential: "YOUR_CRED"
+        },
+        {
+            urls: "turns:YOUR_TURN_HOST:5349",
+            username: "YOUR_USER",
+            credential: "YOUR_CRED"
+        }
+    ]
+}
                     }
                 );
 
