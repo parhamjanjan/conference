@@ -542,6 +542,11 @@ button { color: inherit; }
     animation: pulse 1.8s infinite;
 }
 
+.study-indicator.distracted {
+    background: var(--gold);
+    box-shadow: 0 0 0 5px rgba(251,191,36,.12), 0 0 18px rgba(251,191,36,.5);
+}
+
 #studyStateText { font-size: 13px; font-weight: 750; }
 .study-subtitle { margin-top: 5px; color: var(--muted); font-size: 11px; }
 
@@ -875,7 +880,7 @@ button { color: inherit; }
 <script type="module">
 import {
     FilesetResolver,
-    FaceDetector
+    FaceLandmarker
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs";
 
 /* =========================================
@@ -929,11 +934,23 @@ let isCamOn = false;
 let isStudying = false;
 let isPresent = false;
 
-let faceDetector = null;
+let faceLandmarker = null;
 let detectionLoop = false;
 let detectionBusy = false;
-let lastDetectTs = 0;
+let lastVideoTime = -1;
 let lastSaveTime = 0;
+
+// Grace period — چهره گم شد ولی هنوز state قبلی را نگه داریم
+const FACE_LOST_GRACE_MS = 1800;
+let faceLostSince = 0;
+
+// State stability — جلوگیری از نوسان بین focused/distracted
+const STATE_STABILITY_MS = 1500;
+let candidateState = "away";
+let candidateStateSince = 0;
+
+// آخرین confidence برای گزارش
+let latestConfidence = 0;
 
 let selectedPeriod = "today";
 
@@ -944,7 +961,6 @@ let fractionalMs = 0;
 
 // PiP state
 let pipActive = false;
-let pipTimerInterval = null;
 
 const outgoingCalls = new Map();
 const incomingCalls = new Map();
@@ -956,7 +972,7 @@ let ownStats = { version: 1, days: {} };
 const STATS_KEY = "focus_hall_stats_";
 const REMOTE_KEY = "focus_hall_remote_profiles";
 const PROFILE_SYNC_INTERVAL = 15000;
-const DETECT_INTERVAL_MS = 500;
+const DETECT_INTERVAL_MS = 400;  // ~2.5 FPS
 const CLOCK_TICK_MS = 1000;
 
 /* =========================================
@@ -1672,34 +1688,84 @@ function setupSocket() {
 }
 
 /* =========================================
-   MEDIAPIPE
+   MEDIAPIPE FACELANDMARKER
 ========================================= */
 
-async function initializeFaceDetector() {
-    if (faceDetector) return faceDetector;
+async function initializeFaceLandmarker() {
+    if (faceLandmarker) return faceLandmarker;
+
     const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
     );
-    faceDetector = await FaceDetector.createFromOptions(vision, {
+
+    faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
         baseOptions: {
-            modelAssetPath:
-                "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+            // مدل را در public/mediapipe/ قرار دهید
+            modelAssetPath: "/mediapipe/face_landmarker.task",
             delegate: "CPU"
         },
         runningMode: "VIDEO",
-        minDetectionConfidence: 0.55
+        numFaces: 1,
+        outputFaceBlendshapes: true,
+        minFaceDetectionConfidence: 0.5,
+        minFacePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
     });
-    return faceDetector;
+
+    return faceLandmarker;
 }
 
-function nextDetectTs() {
-    const now = performance.now();
-    lastDetectTs = Math.max(lastDetectTs + 1, now);
-    return lastDetectTs;
+/*
+ * تحلیل جهت سر با landmarkها.
+ * شاخص‌های MediaPipe FaceLandmarker:
+ *   33  = گوشه بیرونی چشم چپ
+ *   133 = گوشه داخلی چشم چپ
+ *   362 = گوشه داخلی چشم راست
+ *   263 = گوشه بیرونی چشم راست
+ *   1   = نوک بینی
+ * اگر بینی از مرکز چشم‌ها خیلی فاصله داشته باشد → سر چرخیده → distracted
+ */
+function analyzeFaceResult(result) {
+    const landmarks = result?.faceLandmarks?.[0];
+
+    if (!landmarks) {
+        return { state: "away", confidence: 0 };
+    }
+
+    const leftEyeOuter = landmarks[33];
+    const leftEyeInner = landmarks[133];
+    const rightEyeInner = landmarks[362];
+    const rightEyeOuter = landmarks[263];
+    const nose = landmarks[1];
+
+    if (!leftEyeOuter || !leftEyeInner || !rightEyeInner || !rightEyeOuter || !nose) {
+        return { state: "distracted", confidence: 0.3 };
+    }
+
+    const leftEyeCenterX = (leftEyeOuter.x + leftEyeInner.x) / 2;
+    const rightEyeCenterX = (rightEyeInner.x + rightEyeOuter.x) / 2;
+    const eyeCenterX = (leftEyeCenterX + rightEyeCenterX) / 2;
+    const eyeDistance = Math.abs(rightEyeCenterX - leftEyeCenterX);
+
+    if (eyeDistance < 0.01) {
+        return { state: "distracted", confidence: 0.3 };
+    }
+
+    const headOffset = Math.abs(nose.x - eyeCenterX);
+    const normalizedOffset = headOffset / eyeDistance;
+
+    if (normalizedOffset > 0.75) {
+        return {
+            state: "distracted",
+            confidence: Math.min(1, normalizedOffset / 1.5)
+        };
+    }
+
+    return { state: "focused", confidence: 0.9 };
 }
 
 /* =========================================
-   STUDY CLOCK (independent of detection)
+   STUDY CLOCK (مستقل از detection)
 ========================================= */
 
 function startStudyClock() {
@@ -1716,7 +1782,6 @@ function startStudyClock() {
         const delta = now - lastTickTime;
         lastTickTime = now;
 
-        // اگر بیش از 5 ثانیه gap بود، نادیده بگیر (sleep/resume)
         if (delta > 5000 || delta < 0) return;
 
         fractionalMs += delta;
@@ -1751,46 +1816,101 @@ function addStudySeconds(seconds) {
 }
 
 /* =========================================
-   DETECTION LOOP
+   STATE STABILITY + GRACE PERIOD
 ========================================= */
 
-async function detectionTick() {
+function updateStableStudyState(nextState) {
+    const now = performance.now();
+
+    if (nextState !== candidateState) {
+        candidateState = nextState;
+        candidateStateSince = now;
+        return;
+    }
+
+    const stableDuration = now - candidateStateSince;
+    if (stableDuration >= STATE_STABILITY_MS) {
+        if (isPresent !== (candidateState === "focused")) {
+            isPresent = (candidateState === "focused");
+
+            // UI
+            if (studyState.value === "focused") {
+                studyIndicator.classList.add("active");
+                studyIndicator.classList.remove("distracted");
+                presenceText.textContent = "You are present · Time is being recorded";
+            } else if (candidateState === "distracted") {
+                studyIndicator.classList.remove("active");
+                studyIndicator.classList.add("distracted");
+                presenceText.textContent = "Head turned away — look at the screen";
+            } else {
+                studyIndicator.classList.remove("active", "distracted");
+                presenceText.textContent = "Waiting for your presence...";
+            }
+        }
+    }
+}
+
+/* =========================================
+   DETECTION LOOP (requestAnimationFrame)
+========================================= */
+
+function detectionTick() {
     if (!detectionLoop || !isStudying) return;
+
     if (detectionBusy) {
         setTimeout(detectionTick, DETECT_INTERVAL_MS);
         return;
     }
 
+    if (!faceLandmarker) {
+        setTimeout(detectionTick, DETECT_INTERVAL_MS);
+        return;
+    }
+
+    const video = presenceVideo;
+    if (!video || video.readyState < 2) {
+        setTimeout(detectionTick, DETECT_INTERVAL_MS);
+        return;
+    }
+
+    // فقط وقتی فریم جدید هست پردازش کن
+    if (video.currentTime === lastVideoTime) {
+        setTimeout(detectionTick, 80);
+        return;
+    }
+
+    lastVideoTime = video.currentTime;
     detectionBusy = true;
+
     try {
-        if (!faceDetector) {
-            detectionBusy = false;
-            setTimeout(detectionTick, DETECT_INTERVAL_MS);
-            return;
-        }
+        // timestamp باید یکنوا باشد و از زمان ویدیو گرفته شود
+        const timestampMs = Math.round(video.currentTime * 1000);
 
-        const ready = await ensurePresenceVideoReady();
-        if (!ready) {
-            presenceText.textContent = "Waiting for camera...";
-            detectionBusy = false;
-            setTimeout(detectionTick, DETECT_INTERVAL_MS);
-            return;
-        }
+        const result = faceLandmarker.detectForVideo(video, timestampMs);
+        const faceCount = result?.faceLandmarks?.length || 0;
 
-        const result = faceDetector.detectForVideo(presenceVideo, nextDetectTs());
-        const detected = Boolean(
-            result?.detections && result.detections.length > 0
-        );
+        if (faceCount === 0) {
+            // چهره گم شد — grace period
+            if (!faceLostSince) {
+                faceLostSince = performance.now();
+            }
 
-        isPresent = detected;
-        studyIndicator.classList.toggle("active", detected);
+            const lostDuration = performance.now() - faceLostSince;
 
-        if (detected) {
-            presenceText.textContent = "You are present · Time is being recorded";
+            if (lostDuration < FACE_LOST_GRACE_MS) {
+                // هنوز در grace — state فعلی را نگه دار
+            } else {
+                updateStableStudyState("away");
+                latestConfidence = 0;
+            }
         } else {
-            presenceText.textContent = "Waiting for your presence...";
+            faceLostSince = 0;
+            const analysis = analyzeFaceResult(result);
+            latestConfidence = analysis.confidence;
+            updateStableStudyState(analysis.state);
         }
 
+        // ذخیره‌ی دوره‌ای
         if (Date.now() - lastSaveTime > 5000) {
             saveOwnStats();
             sendMyProfile();
@@ -1798,20 +1918,21 @@ async function detectionTick() {
         }
     } catch (error) {
         console.warn("Detection error:", error);
-        presenceText.textContent = "Detection temporarily unavailable";
-        // پاک نکن isPresent را — بگذار clock کار کند
+        // isPresent را عمداً تغییر نمی‌دهیم تا تایمر قطع نشود
     } finally {
         detectionBusy = false;
-        if (detectionLoop && isStudying) {
-            setTimeout(detectionTick, DETECT_INTERVAL_MS);
-        }
+        setTimeout(detectionTick, DETECT_INTERVAL_MS);
     }
 }
 
 async function startPresenceDetection() {
     await ensureCameraStream();
-    await initializeFaceDetector();
+    await initializeFaceLandmarker();
+
     detectionLoop = true;
+    lastVideoTime = -1;
+    faceLostSince = 0;
+
     presenceText.textContent = "Camera ready. Detecting your presence...";
     detectionTick();
 }
@@ -1819,11 +1940,17 @@ async function startPresenceDetection() {
 function stopPresenceDetection() {
     detectionLoop = false;
     isPresent = false;
-    studyIndicator.classList.remove("active");
-    if (faceDetector) {
-        try { faceDetector.close(); } catch {}
-        faceDetector = null;
+    latestConfidence = 0;
+    faceLostSince = 0;
+    candidateState = "away";
+    candidateStateSince = 0;
+    studyIndicator.classList.remove("active", "distracted");
+
+    if (faceLandmarker) {
+        try { faceLandmarker.close(); } catch {}
+        faceLandmarker = null;
     }
+
     releaseCameraIfUnused();
 }
 
@@ -1843,7 +1970,6 @@ async function enterPiP() {
         pipTimerText.textContent = studyTimer.textContent;
     } catch (err) {
         console.warn("PiP failed:", err);
-        // حتی اگر PiP نشد، ویجت کوچک را نمایش بده (نمی‌تواند always-on-top باشد ولی داخل صفحه می‌ماند)
         pipActive = true;
         pipBtnText.textContent = "Close Mini Timer";
         pipTimerWidget.classList.add("visible");
@@ -1864,7 +1990,6 @@ async function exitPiP() {
     pipTimerWidget.classList.remove("visible");
 }
 
-// listen for PiP state changes
 presenceVideo.addEventListener("enterpictureinpicture", () => {
     pipActive = true;
     pipBtn.style.display = "inline-flex";
@@ -1894,11 +2019,9 @@ pipBtn.addEventListener("click", async () => {
 function updateStudyUI() {
     studyBtn.classList.toggle("active", isStudying);
     studyBtnText.textContent = isStudying ? "Stop Studying" : "Start Studying";
-    studyIndicator.classList.toggle("active", isPresent);
     studyStateText.textContent = isStudying
         ? "Study session active"
         : "Study session inactive";
-    // نمایش دکمه PiP فقط در حین مطالعه
     pipBtn.style.display = isStudying ? "inline-flex" : "none";
     renderMembers();
 }
@@ -1911,7 +2034,6 @@ async function startStudy() {
         await startPresenceDetection();
 
         isStudying = true;
-        // تایمر مستقل از detection شروع شود
         startStudyClock();
         updateStudyUI();
 
@@ -1919,8 +2041,6 @@ async function startStudy() {
             socket.emit("study-status", { studying: true });
         }
 
-        // تلاش برای ورود به PiP تا video زنده بماند
-        // (نیاز به تعامل کاربر دارد — این تابع داخل کلیک کاربر است)
         setTimeout(() => {
             enterPiP().catch(() => {});
         }, 500);
@@ -2087,11 +2207,9 @@ async function joinRoom() {
 }
 
 /* =========================================
-   VISIBILITY (تایمر ادامه پیدا می‌کند)
+   VISIBILITY
 ========================================= */
 
-// دیگر detection را در تب hidden متوقف نمی‌کنیم.
-// فقط اگر PiP فعال نیست، به کاربر اطلاع بده.
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible" && isStudying) {
         if (!document.pictureInPictureElement) {
@@ -2100,9 +2218,13 @@ document.addEventListener("visibilitychange", () => {
             presenceText.textContent = "Running in Picture-in-Picture — tracking continues";
         }
     } else if (document.visibilityState === "visible" && isStudying) {
-        presenceText.textContent = isPresent
-            ? "You are present · Time is being recorded"
-            : "Waiting for your presence...";
+        if (isPresent) {
+            presenceText.textContent = "You are present · Time is being recorded";
+        } else if (candidateState === "distracted") {
+            presenceText.textContent = "Head turned away — look at the screen";
+        } else {
+            presenceText.textContent = "Waiting for your presence...";
+        }
     }
 });
 
@@ -2116,7 +2238,6 @@ setInterval(() => {
     sendMyProfile();
 }, PROFILE_SYNC_INTERVAL);
 
-// هر 30 ثانیه حتی اگر چیز دیگری نبود، stats را ذخیره کن
 setInterval(() => {
     if (isStudying) saveOwnStats();
 }, 30000);
