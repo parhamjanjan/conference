@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سالن کنفرانس</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: Tahoma, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #fff; min-height: 100vh; padding: 20px;
+        }
+        #joinScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .join-box {
+            background: #1e293b; padding: 40px 35px; border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5); width: 100%; max-width: 420px; text-align: center;
+        }
+        .join-box h1 { font-size: 26px; margin-bottom: 8px; }
+        .join-box p { color: #94a3b8; font-size: 14px; margin-bottom: 25px; }
+        .join-box input {
+            width: 100%; padding: 14px 16px; border: 2px solid #334155; border-radius: 10px;
+            background: #0f172a; color: #fff; font-size: 16px; font-family: inherit;
+            outline: none; margin-bottom: 12px; transition: 0.2s;
+        }
+        .join-box input:focus { border-color: #3b82f6; }
+        .join-box button {
+            width: 100%; padding: 14px; border: none; border-radius: 10px;
+            background: #3b82f6; color: #fff; font-size: 16px; font-weight: bold;
+            cursor: pointer; font-family: inherit; transition: 0.2s;
+        }
+        .join-box button:hover { background: #2563eb; }
+        .join-box button:disabled { background: #475569; cursor: not-allowed; }
+        .error { color: #f87171; font-size: 13px; margin-top: 10px; min-height: 18px; }
+        #roomScreen { display: none; }
+        #roomScreen.active { display: block; }
+        .room-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
+            max-width: 1400px; margin-left: auto; margin-right: auto;
+        }
+        .room-header h2 { font-size: 20px; }
+        .user-badge { background: #3b82f6; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+        #videoGrid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px; max-width: 1400px; margin: 0 auto 20px;
+        }
+        .video-tile {
+            position: relative; width: 100%; aspect-ratio: 16/9; background: #000;
+            border-radius: 14px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 2px solid #334155;
+        }
+        .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+        .video-tile.mirror video { transform: scaleX(-1); }
+        .video-tile .placeholder {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 10px;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+        }
+        .video-tile .placeholder .icon { font-size: 60px; opacity: 0.4; }
+        .video-tile .placeholder .txt { color: #64748b; font-size: 14px; }
+        .video-tile.has-video .placeholder { display: none; }
+        .name-tag {
+            position: absolute; bottom: 10px; right: 10px;
+            background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(6px);
+            padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: bold;
+            display: flex; align-items: center; gap: 7px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+        .dot.on { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+        .you-badge {
+            position: absolute; top: 10px; left: 10px; background: #3b82f6;
+            padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold;
+        }
+        .controls { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        .btn {
+            padding: 14px 28px; border: none; border-radius: 12px; font-size: 15px;
+            font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s;
+            display: flex; align-items: center; gap: 8px;
+        }
+        #toggleBtn { background: #22c55e; color: #fff; box-shadow: 0 6px 20px rgba(34,197,94,0.3); }
+        #toggleBtn.off { background: #ef4444; box-shadow: 0 6px 20px rgba(239,68,68,0.3); }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        #statusMsg {
+            text-align: center; margin-top: 14px; font-size: 14px;
+            color: #94a3b8; min-height: 20px; max-width: 1400px;
+            margin-left: auto; margin-right: auto;
+        }
+        @media (max-width: 600px) {
+            .join-box { padding: 30px 22px; }
+            #videoGrid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="joinScreen">
+    <div class="join-box">
+        <h1>🎥 سالن کنفرانس</h1>
+        <p>اسم و کد اتاق رو وارد کنید</p>
+        <input type="text" id="nameInput" placeholder="اسم شما..." maxlength="30" autocomplete="off">
+        <input type="text" id="roomInput" placeholder="کد اتاق (مثلاً: office-123)" maxlength="40" autocomplete="off">
+        <button id="joinBtn" disabled>ورود به سالن</button>
+        <div class="error" id="errorMsg"></div>
+    </div>
+</div>
+
+<div id="roomScreen">
+    <div class="room-header">
+        <h2>🎥 سالن: <span id="roomNameLabel"></span></h2>
+        <div class="user-badge" id="userBadge"></div>
+    </div>
+    <div id="videoGrid"></div>
+    <div class="controls">
+        <button id="toggleBtn" class="btn">
+            <span id="toggleIcon">📷</span>
+            <span id="toggleText">روشن کردن وبکم</span>
+        </button>
+    </div>
+    <div id="statusMsg"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const joinScreen = document.getElementById('joinScreen');
+const roomScreen = document.getElementById('roomScreen');
+const nameInput  = document.getElementById('nameInput');
+const roomInput  = document.getElementById('roomInput');
+const joinBtn    = document.getElementById('joinBtn');
+const errorMsg   = document.getElementById('errorMsg');
+const userBadge  = document.getElementById('userBadge');
+const roomLabel  = document.getElementById('roomNameLabel');
+const videoGrid  = document.getElementById('videoGrid');
+const toggleBtn  = document.getElementById('toggleBtn');
+const toggleText = document.getElementById('toggleText');
+const toggleIcon = document.getElementById('toggleIcon');
+const statusMsg  = document.getElementById('statusMsg');
+
+let peer = null, myId = '', userName = '', roomName = '';
+let socket = null;
+let localStream = null;
+let isCamOn = false;
+const activeCalls = new Map();
+const connections = new Map();
+
+function updateJoinBtn() {
+    joinBtn.disabled = !(nameInput.value.trim() && roomInput.value.trim());
+}
+nameInput.addEventListener('input', updateJoinBtn);
+roomInput.addEventListener('input', updateJoinBtn);
+
+try {
+    nameInput.value = localStorage.getItem('confName') || '';
+    roomInput.value = localStorage.getItem('confRoom') || 'main-room';
+    updateJoinBtn();
+} catch(e) {}
+
+joinBtn.addEventListener('click', async () => {
+    userName = nameInput.value.trim();
+    roomName = roomInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!userName || !roomName) return;
+
+    try {
+        localStorage.setItem('confName', userName);
+        localStorage.setItem('confRoom', roomName);
+    } catch(e) {}
+
+    joinBtn.disabled = true;
+    joinBtn.textContent = 'در حال اتصال...';
+    errorMsg.textContent = '';
+
+    const myPeerId = `conf-${roomName}-${Math.random().toString(36).substring(2, 10)}`;
+
+    peer = new Peer(myPeerId, {
+        debug: 1,
+        config: {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:global.stun.twilio.com:3478' }
+            ]
+        }
+    });
+
+    peer.on('open', (id) => {
+        myId = id;
+        userBadge.textContent = '👤 ' + userName;
+        roomLabel.textContent = roomName;
+        joinScreen.style.display = 'none';
+        roomScreen.classList.add('active');
+        addLocalTile();
+        statusMsg.textContent = '✅ به سالن متصل شدید.';
+
+        // اتصال به Socket.IO
+        socket = io();
+        socket.emit('join', { room: roomName, peerId: myId });
+
+        socket.on('others', (list) => {
+            console.log('Others in room:', list);
+            list.forEach(({ peerId }) => connectToPeer(peerId));
+        });
+
+        socket.on('peer-joined', ({ peerId }) => {
+            console.log('Peer joined:', peerId);
+            connectToPeer(peerId);
+            if (isCamOn) callPeer(peerId);
+        });
+
+        socket.on('peer-left', ({ peerId }) => {
+            removeConnection(peerId);
+        });
+    });
+
+    peer.on('error', (err) => {
+        console.error('Peer error:', err);
+        if (err.type === 'unavailable-id') {
+            errorMsg.textContent = 'آیدی در حال استفاده است. دوباره تلاش کنید.';
+            joinBtn.disabled = false;
+            joinBtn.textContent = 'ورود به سالن';
+        } else if (err.type === 'peer-unavailable') {
+            // نادیده بگیر
+        } else {
+            errorMsg.textContent = 'خطا: ' + err.message;
+        }
+    });
+
+    peer.on('call', (call) => {
+        const peerId = call.peer;
+        activeCalls.set(peerId, call);
+        call.answer(localStream || null);
+        call.on('stream', (remoteStream) => attachRemoteStream(peerId, remoteStream));
+        call.on('close', () => removeConnection(peerId));
+    });
+
+    peer.on('connection', (conn) => setupDataConnection(conn));
+});
+
+function createTile(id, name, isMe) {
+    const tile = document.createElement('div');
+    tile.className = 'video-tile' + (isMe ? ' mirror' : '');
+    tile.id = 'tile-' + id;
+    tile.innerHTML = `
+        <video autoplay playsinline ${isMe ? 'muted' : ''}></video>
+        <div class="placeholder">
+            <div class="icon">📷</div>
+            <div class="txt">وبکم خاموش است</div>
+        </div>
+        <div class="name-tag">
+            <span class="dot"></span>
+            <span class="name-text"></span>
+        </div>
+        ${isMe ? '<div class="you-badge">شما</div>' : ''}
+    `;
+    tile.querySelector('.name-text').textContent = name || 'کاربر';
+    videoGrid.appendChild(tile);
+    return {
+        tile,
+        video: tile.querySelector('video'),
+        dot: tile.querySelector('.dot')
+    };
+}
+
+function addLocalTile() {
+    const { tile, video, dot } = createTile(myId, userName, true);
+    connections.set(myId, { name: userName, isMe: true, tile, video, dot });
+}
+
+function attachRemoteStream(peerId, stream) {
+    let entry = connections.get(peerId);
+    if (!entry) {
+        const { tile, video, dot } = createTile(peerId, 'کاربر', false);
+        entry = { name: 'کاربر', isMe: false, tile, video, dot };
+        connections.set(peerId, entry);
+    }
+    entry.video.srcObject = stream;
+    entry.tile.classList.add('has-video');
+    entry.dot.classList.add('on');
+    connectToPeer(peerId);
+}
+
+function removeConnection(peerId) {
+    const entry = connections.get(peerId);
+    if (entry) {
+        if (entry.video.srcObject) {
+            entry.video.srcObject.getTracks().forEach(t => t.stop());
+        }
+        entry.tile.remove();
+        connections.delete(peerId);
+    }
+    activeCalls.delete(peerId);
+}
+
+async function startCamera() {
+    try {
+        statusMsg.textContent = 'در حال اتصال به وبکم...';
+        localStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: false
+        });
+        isCamOn = true;
+
+        const me = connections.get(myId);
+        if (me) {
+            me.video.srcObject = localStream;
+            me.tile.classList.add('has-video');
+            me.dot.classList.add('on');
+        }
+
+        for (const peerId of connections.keys()) {
+            if (peerId === myId) continue;
+            callPeer(peerId);
+        }
+
+        toggleText.textContent = 'خاموش کردن وبکم';
+        toggleIcon.textContent = '🔴';
+        toggleBtn.classList.add('off');
+        statusMsg.textContent = '✅ وبکم روشن است.';
+    } catch (err) {
+        statusMsg.textContent = '❌ ' + err.message;
+        if (err.name === 'NotAllowedError') statusMsg.textContent = '❌ دسترسی رد شد.';
+        else if (err.name === 'NotFoundError') statusMsg.textContent = '❌ وبکمی نیست.';
+        stopCamera(false);
+    }
+}
+
+function stopCamera(updateUI = true) {
+    if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        localStream = null;
+    }
+    isCamOn = false;
+
+    const me = connections.get(myId);
+    if (me) {
+        me.video.srcObject = null;
+        me.tile.classList.remove('has-video');
+        me.dot.classList.remove('on');
+    }
+
+    for (const call of activeCalls.values()) {
+        try { call.close(); } catch(e) {}
+    }
+    activeCalls.clear();
+
+    for (const [peerId, entry] of connections) {
+        if (peerId === myId) continue;
+        entry.video.srcObject = null;
+        entry.tile.classList.remove('has-video');
+        entry.dot.classList.remove('on');
+    }
+
+    if (updateUI) {
+        toggleText.textContent = 'روشن کردن وبکم';
+        toggleIcon.textContent = '📷';
+        toggleBtn.classList.remove('off');
+        statusMsg.textContent = 'وبکم خاموش است';
+    }
+}
+
+toggleBtn.addEventListener('click', () => {
+    isCamOn ? stopCamera() : startCamera();
+});
+
+function callPeer(peerId) {
+    if (!localStream || !peer) return;
+    if (activeCalls.has(peerId)) return;
+    const call = peer.call(peerId, localStream);
+    if (!call) return;
+    activeCalls.set(peerId, call);
+    call.on('stream', (s) => attachRemoteStream(peerId, s));
+    call.on('close', () => removeConnection(peerId));
+}
+
+function connectToPeer(peerId) {
+    if (!peer) return;
+    if (connections.get(peerId)?.conn) return;
+    const conn = peer.connect(peerId, { reliable: true });
+    setupDataConnection(conn);
+}
+
+function setupDataConnection(conn) {
+    conn.on('open', () => {
+        conn.send({ type: 'name', name: userName, camOn: isCamOn });
+    });
+    conn.on('data', (data) => {
+        if (data.type === 'name') {
+            const peerId = conn.peer;
+            const entry = connections.get(peerId);
+            if (entry) {
+                entry.name = data.name;
+                entry.tile.querySelector('.name-text').textContent = data.name;
+                entry.conn = conn;
+            } else {
+                const { tile, video, dot } = createTile(peerId, data.name, false);
+                connections.set(peerId, {
+                    name: data.name, isMe: false, tile, video, dot, conn
+                });
+            }
+            if (isCamOn && localStream && !activeCalls.has(peerId)) {
+                callPeer(peerId);
+            }
+        }
+    });
+    conn.on('close', () => removeConnection(conn.peer));
+}
+
+window.addEventListener('beforeunload', () => {
+    stopCamera(false);
+    if (peer) { try { peer.destroy(); } catch(e) {} }
+});
+</script>
+</body>
+</html>
