@@ -1,122 +1,502 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سالن کنفرانس</title>
+    <title>Conference Hall</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #13131a;
+            --surface-2: #1a1a24;
+            --border: #26262f;
+            --text: #f5f5f7;
+            --text-dim: #8a8a94;
+            --accent: #6366f1;
+            --accent-hover: #7c7ff5;
+            --green: #10b981;
+            --red: #ef4444;
+            --radius: 14px;
+        }
+
         * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: Tahoma, sans-serif;
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: #fff; min-height: 100vh; padding: 20px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px;
+            -webkit-font-smoothing: antialiased;
         }
-        #joinScreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-        .join-box {
-            background: #1e293b; padding: 40px 35px; border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5); width: 100%; max-width: 420px; text-align: center;
+
+        /* Background subtle gradient */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.15), transparent),
+                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(99, 102, 241, 0.08), transparent);
+            pointer-events: none;
+            z-index: -1;
         }
-        .join-box h1 { font-size: 26px; margin-bottom: 8px; }
-        .join-box p { color: #94a3b8; font-size: 14px; margin-bottom: 25px; }
-        .join-box input {
-            width: 100%; padding: 14px 16px; border: 2px solid #334155; border-radius: 10px;
-            background: #0f172a; color: #fff; font-size: 16px; font-family: inherit;
-            outline: none; margin-bottom: 12px; transition: 0.2s;
+
+        /* ===== JOIN SCREEN ===== */
+        #joinScreen {
+            min-height: calc(100vh - 48px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .join-box input:focus { border-color: #3b82f6; }
-        .join-box button {
-            width: 100%; padding: 14px; border: none; border-radius: 10px;
-            background: #3b82f6; color: #fff; font-size: 16px; font-weight: bold;
-            cursor: pointer; font-family: inherit; transition: 0.2s;
+        .join-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 48px 40px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
         }
-        .join-box button:hover { background: #2563eb; }
-        .join-box button:disabled { background: #475569; cursor: not-allowed; }
-        .error { color: #f87171; font-size: 13px; margin-top: 10px; min-height: 18px; }
-        #roomScreen { display: none; }
+        .join-card .logo {
+            width: 56px; height: 56px;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px;
+            margin-bottom: 24px;
+        }
+        .join-card h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+        }
+        .join-card p {
+            color: var(--text-dim);
+            font-size: 15px;
+            line-height: 1.5;
+            margin-bottom: 32px;
+        }
+        .field { margin-bottom: 16px; }
+        .field label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+        .field input {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .field input::placeholder { color: #55555f; }
+        .field input:focus {
+            border-color: var(--accent);
+            background: #1c1c28;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 15px;
+            background: var(--accent);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+        }
+        .btn-primary:active:not(:disabled) { transform: translateY(0); }
+        .btn-primary:disabled {
+            background: var(--surface-2);
+            color: var(--text-dim);
+            cursor: not-allowed;
+        }
+        .error {
+            color: var(--red);
+            font-size: 13px;
+            margin-top: 14px;
+            min-height: 18px;
+            text-align: center;
+        }
+
+        /* ===== ROOM SCREEN ===== */
+        #roomScreen { display: none; max-width: 1600px; margin: 0 auto; }
         #roomScreen.active { display: block; }
-        .room-header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
-            max-width: 1400px; margin-left: auto; margin-right: auto;
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            gap: 16px;
+            flex-wrap: wrap;
         }
-        .room-header h2 { font-size: 20px; }
-        .user-badge { background: #3b82f6; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: bold; }
+        .topbar-left { display: flex; align-items: center; gap: 14px; }
+        .brand-icon {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: 11px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+        }
+        .topbar h2 {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+        .topbar h2 span { color: var(--text-dim); font-weight: 500; }
+        .user-chip {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .user-chip .avatar {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700;
+        }
+
+        /* ===== MAIN LAYOUT ===== */
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 20px;
+        }
+        @media (max-width: 960px) {
+            .layout { grid-template-columns: 1fr; }
+            .members-panel { order: -1; }
+        }
+
+        /* ===== VIDEO GRID ===== */
         #videoGrid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px; max-width: 1400px; margin: 0 auto 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            align-content: start;
         }
         .video-tile {
-            position: relative; width: 100%; aspect-ratio: 16/9; background: #000;
-            border-radius: 14px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            border: 2px solid #334155;
+            position: relative;
+            aspect-ratio: 16/9;
+            background: var(--surface);
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: border-color 0.2s;
         }
-        .video-tile video { width: 100%; height: 100%; object-fit: cover; }
+        .video-tile:hover { border-color: #3a3a48; }
+        .video-tile video {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            background: #000;
+        }
         .video-tile.mirror video { transform: scaleX(-1); }
+
         .video-tile .placeholder {
-            position: absolute; inset: 0; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; gap: 10px;
-            background: linear-gradient(135deg, #1e293b, #0f172a);
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 14px;
+            background: var(--surface);
         }
-        .video-tile .placeholder .icon { font-size: 60px; opacity: 0.4; }
-        .video-tile .placeholder .txt { color: #64748b; font-size: 14px; }
+        .video-tile .avatar-lg {
+            width: 88px; height: 88px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #26262f, #1a1a24);
+            border: 2px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--text-dim);
+        }
+        .video-tile .placeholder .txt {
+            color: var(--text-dim);
+            font-size: 13px;
+            font-weight: 500;
+        }
         .video-tile.has-video .placeholder { display: none; }
+
         .name-tag {
-            position: absolute; bottom: 10px; right: 10px;
-            background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(6px);
-            padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: bold;
-            display: flex; align-items: center; gap: 7px;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
-        .dot.on { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
-        .you-badge {
-            position: absolute; top: 10px; left: 10px; background: #3b82f6;
-            padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold;
-        }
-        .controls { display: flex; justify-content: center; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
-        .btn {
-            padding: 14px 28px; border: none; border-radius: 12px; font-size: 15px;
-            font-weight: bold; cursor: pointer; font-family: inherit; transition: 0.2s;
+            position: absolute;
+            bottom: 12px; left: 12px;
+            background: rgba(10, 10, 15, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
             display: flex; align-items: center; gap: 8px;
+            border: 1px solid rgba(255,255,255,0.08);
+            max-width: calc(100% - 24px);
         }
-        #toggleBtn { background: #22c55e; color: #fff; box-shadow: 0 6px 20px rgba(34,197,94,0.3); }
-        #toggleBtn.off { background: #ef4444; box-shadow: 0 6px 20px rgba(239,68,68,0.3); }
-        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .name-tag .name-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--red);
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .dot.on {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+        }
+        .you-tag {
+            position: absolute;
+            top: 12px; right: 12px;
+            background: var(--accent);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        /* ===== MEMBERS PANEL ===== */
+        .members-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            height: fit-content;
+            position: sticky;
+            top: 24px;
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .panel-header h3 {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+        .count-badge {
+            background: var(--accent);
+            color: #fff;
+            padding: 2px 10px;
+            border-radius: 100px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .member-list { display: flex; flex-direction: column; gap: 6px; }
+        .member-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border-radius: 10px;
+            font-size: 14px;
+            transition: background 0.15s;
+        }
+        .member-item:hover { background: #1f1f2a; }
+        .member-avatar {
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #26262f, #1a1a24);
+            border: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+        .member-item.me .member-avatar {
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            color: #fff;
+            border-color: transparent;
+        }
+        .member-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+        .member-name .you-label {
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+            margin-left: 4px;
+        }
+        .member-status {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #3a3a48;
+            flex-shrink: 0;
+        }
+        .member-status.cam-on {
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+        }
+
+        /* ===== CONTROLS ===== */
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 24px;
+        }
+        .btn-cam {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 32px;
+            border: none;
+            border-radius: 100px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--green);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+        }
+        .btn-cam:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 28px rgba(16, 185, 129, 0.45);
+        }
+        .btn-cam:active { transform: translateY(0); }
+        .btn-cam.off {
+            background: var(--red);
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+        }
+        .btn-cam.off:hover {
+            box-shadow: 0 8px 28px rgba(239, 68, 68, 0.45);
+        }
+        .btn-cam svg {
+            width: 20px; height: 20px;
+        }
+
         #statusMsg {
-            text-align: center; margin-top: 14px; font-size: 14px;
-            color: #94a3b8; min-height: 20px; max-width: 1400px;
-            margin-left: auto; margin-right: auto;
+            text-align: center;
+            margin-top: 16px;
+            font-size: 13px;
+            color: var(--text-dim);
+            min-height: 20px;
+            font-weight: 500;
         }
-        @media (max-width: 600px) {
-            .join-box { padding: 30px 22px; }
-            #videoGrid { grid-template-columns: 1fr; }
+        #statusMsg.error-text { color: var(--red); }
+
+        /* Loading spinner */
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Empty state */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-dim);
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+        .empty-state p { font-size: 15px; }
     </style>
 </head>
 <body>
 
+<!-- ===== JOIN SCREEN ===== -->
 <div id="joinScreen">
-    <div class="join-box">
-        <h1>🎥 سالن کنفرانس</h1>
-        <p>اسم و کد اتاق رو وارد کنید</p>
-        <input type="text" id="nameInput" placeholder="اسم شما..." maxlength="30" autocomplete="off">
-        <input type="text" id="roomInput" placeholder="کد اتاق (مثلاً: office-123)" maxlength="40" autocomplete="off">
-        <button id="joinBtn" disabled>ورود به سالن</button>
+    <div class="join-card">
+        <div class="logo">🎥</div>
+        <h1>Conference Hall</h1>
+        <p>Join a room and share your camera with others in real time.</p>
+
+        <div class="field">
+            <label>Your Name</label>
+            <input type="text" id="nameInput" placeholder="John Doe" maxlength="30" autocomplete="off">
+        </div>
+
+        <div class="field">
+            <label>Room Code</label>
+            <input type="text" id="roomInput" placeholder="team-standup" maxlength="40" autocomplete="off">
+        </div>
+
+        <button id="joinBtn" class="btn-primary" disabled>Join Room</button>
         <div class="error" id="errorMsg"></div>
     </div>
 </div>
 
+<!-- ===== ROOM SCREEN ===== -->
 <div id="roomScreen">
-    <div class="room-header">
-        <h2>🎥 سالن: <span id="roomNameLabel"></span></h2>
-        <div class="user-badge" id="userBadge"></div>
+    <div class="topbar">
+        <div class="topbar-left">
+            <div class="brand-icon">🎥</div>
+            <h2>Conference Hall <span>/ <span id="roomNameLabel"></span></span></h2>
+        </div>
+        <div class="user-chip" id="userBadge">
+            <span class="avatar" id="userAvatar">?</span>
+            <span id="userNameLabel"></span>
+        </div>
     </div>
-    <div id="videoGrid"></div>
+
+    <div class="layout">
+        <div id="videoGrid"></div>
+
+        <div class="members-panel">
+            <div class="panel-header">
+                <h3>Participants</h3>
+                <span class="count-badge" id="memberCount">0</span>
+            </div>
+            <div class="member-list" id="memberList"></div>
+        </div>
+    </div>
+
     <div class="controls">
-        <button id="toggleBtn" class="btn">
-            <span id="toggleIcon">📷</span>
-            <span id="toggleText">روشن کردن وبکم</span>
+        <button id="toggleBtn" class="btn-cam">
+            <svg id="camIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 7l-7 5 7 5V7z"/>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+            <span id="toggleText">Start Camera</span>
         </button>
     </div>
     <div id="statusMsg"></div>
@@ -124,27 +504,31 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
+// ================== Elements ==================
 const joinScreen = document.getElementById('joinScreen');
 const roomScreen = document.getElementById('roomScreen');
 const nameInput  = document.getElementById('nameInput');
 const roomInput  = document.getElementById('roomInput');
 const joinBtn    = document.getElementById('joinBtn');
 const errorMsg   = document.getElementById('errorMsg');
-const userBadge  = document.getElementById('userBadge');
+const userAvatar = document.getElementById('userAvatar');
+const userNameLabel = document.getElementById('userNameLabel');
 const roomLabel  = document.getElementById('roomNameLabel');
 const videoGrid  = document.getElementById('videoGrid');
+const memberList = document.getElementById('memberList');
+const memberCount= document.getElementById('memberCount');
 const toggleBtn  = document.getElementById('toggleBtn');
 const toggleText = document.getElementById('toggleText');
-const toggleIcon = document.getElementById('toggleIcon');
+const camIcon    = document.getElementById('camIcon');
 const statusMsg  = document.getElementById('statusMsg');
 
+// ================== State ==================
 let peer = null, myId = '', userName = '', roomName = '';
-let socket = null;
-let localStream = null;
-let isCamOn = false;
-const activeCalls = new Map();
-const connections = new Map();
+let socket = null, localStream = null, isCamOn = false;
+const connections = new Map(); // peerId → { name, camOn, isMe, tile, video, dot, conn }
+const activeCalls = new Map(); // peerId → call
 
+// ================== Join form ==================
 function updateJoinBtn() {
     joinBtn.disabled = !(nameInput.value.trim() && roomInput.value.trim());
 }
@@ -153,10 +537,11 @@ roomInput.addEventListener('input', updateJoinBtn);
 
 try {
     nameInput.value = localStorage.getItem('confName') || '';
-    roomInput.value = localStorage.getItem('confRoom') || 'main-room';
+    roomInput.value = localStorage.getItem('confRoom') || '';
     updateJoinBtn();
 } catch(e) {}
 
+// ================== Join ==================
 joinBtn.addEventListener('click', async () => {
     userName = nameInput.value.trim();
     roomName = roomInput.value.trim().replace(/[^a-zA-Z0-9_-]/g, '');
@@ -168,7 +553,7 @@ joinBtn.addEventListener('click', async () => {
     } catch(e) {}
 
     joinBtn.disabled = true;
-    joinBtn.textContent = 'در حال اتصال...';
+    joinBtn.textContent = 'Connecting...';
     errorMsg.textContent = '';
 
     const myPeerId = `conf-${roomName}-${Math.random().toString(36).substring(2, 10)}`;
@@ -179,50 +564,70 @@ joinBtn.addEventListener('click', async () => {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:global.stun.twilio.com:3478' }
+                { urls: 'stun:global.stun.twilio.com:3478' },
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                }
             ]
         }
     });
 
     peer.on('open', (id) => {
         myId = id;
-        userBadge.textContent = '👤 ' + userName;
+        userAvatar.textContent = userName.charAt(0).toUpperCase();
+        userNameLabel.textContent = userName;
         roomLabel.textContent = roomName;
         joinScreen.style.display = 'none';
         roomScreen.classList.add('active');
-        addLocalTile();
-        statusMsg.textContent = '✅ به سالن متصل شدید.';
 
-        // اتصال به Socket.IO
+        addLocalTile();
+        showEmptyHint();
+
+        statusMsg.textContent = 'Connected. Start your camera to share with others.';
+
         socket = io();
-        socket.emit('join', { room: roomName, peerId: myId });
+
+        socket.on('connect', () => {
+            socket.emit('join', { room: roomName, peerId: myId, name: userName });
+        });
 
         socket.on('others', (list) => {
-            console.log('Others in room:', list);
-            list.forEach(({ peerId }) => connectToPeer(peerId));
+            list.forEach(info => {
+                ensureTile(info.peerId, info.name);
+                connectToPeer(info.peerId);
+            });
+            hideEmptyHint();
         });
 
-        socket.on('peer-joined', ({ peerId }) => {
-            console.log('Peer joined:', peerId);
-            connectToPeer(peerId);
-            if (isCamOn) callPeer(peerId);
+        socket.on('peer-joined', (info) => {
+            ensureTile(info.peerId, info.name);
+            connectToPeer(info.peerId);
+            if (isCamOn && localStream) setTimeout(() => callPeer(info.peerId), 300);
+            hideEmptyHint();
         });
 
-        socket.on('peer-left', ({ peerId }) => {
-            removeConnection(peerId);
+        socket.on('peer-left', ({ peerId }) => removeConnection(peerId));
+
+        socket.on('peer-cam-status', ({ peerId, camOn }) => {
+            const entry = connections.get(peerId);
+            if (entry) {
+                entry.camOn = camOn;
+                entry.dot.classList.toggle('on', camOn);
+                updateMemberPanel();
+            }
         });
+
+        socket.on('member-list', (list) => renderMemberList(list));
     });
 
     peer.on('error', (err) => {
         console.error('Peer error:', err);
         if (err.type === 'unavailable-id') {
-            errorMsg.textContent = 'آیدی در حال استفاده است. دوباره تلاش کنید.';
-            joinBtn.disabled = false;
-            joinBtn.textContent = 'ورود به سالن';
+            errorMsg.textContent = 'This ID is taken. Please refresh the page.';
         } else if (err.type === 'peer-unavailable') {
-            // نادیده بگیر
-        } else {
-            errorMsg.textContent = 'خطا: ' + err.message;
+            // user left — ignore
         }
     });
 
@@ -230,71 +635,98 @@ joinBtn.addEventListener('click', async () => {
         const peerId = call.peer;
         activeCalls.set(peerId, call);
         call.answer(localStream || null);
-        call.on('stream', (remoteStream) => attachRemoteStream(peerId, remoteStream));
-        call.on('close', () => removeConnection(peerId));
+        call.on('stream', (remoteStream) => attachStream(peerId, remoteStream));
+        call.on('close', () => {
+            activeCalls.delete(peerId);
+            const entry = connections.get(peerId);
+            if (entry && !entry.isMe) {
+                entry.video.srcObject = null;
+                entry.tile.classList.remove('has-video');
+                entry.dot.classList.remove('on');
+                entry.camOn = false;
+            }
+        });
+        call.on('error', (e) => console.warn('Call error:', e));
     });
 
-    peer.on('connection', (conn) => setupDataConnection(conn));
+    peer.on('connection', (conn) => setupDataConn(conn));
 });
+
+// ================== Tiles ==================
+function ensureTile(peerId, name) {
+    if (connections.has(peerId)) {
+        const entry = connections.get(peerId);
+        if (name && entry.name !== name) {
+            entry.name = name;
+            entry.tile.querySelector('.name-text').textContent = name;
+        }
+        return entry;
+    }
+    const { tile, video, dot } = createTile(peerId, name || 'User', false);
+    const entry = { name: name || 'User', isMe: false, camOn: false, tile, video, dot, conn: null };
+    connections.set(peerId, entry);
+    return entry;
+}
+
+function addLocalTile() {
+    const { tile, video, dot } = createTile(myId, userName, true);
+    connections.set(myId, { name: userName, isMe: true, camOn: false, tile, video, dot, conn: null });
+}
 
 function createTile(id, name, isMe) {
     const tile = document.createElement('div');
     tile.className = 'video-tile' + (isMe ? ' mirror' : '');
     tile.id = 'tile-' + id;
+    const initial = (name || '?').charAt(0).toUpperCase();
     tile.innerHTML = `
         <video autoplay playsinline ${isMe ? 'muted' : ''}></video>
         <div class="placeholder">
-            <div class="icon">📷</div>
-            <div class="txt">وبکم خاموش است</div>
+            <div class="avatar-lg">${initial}</div>
+            <div class="txt">Camera off</div>
         </div>
         <div class="name-tag">
             <span class="dot"></span>
             <span class="name-text"></span>
         </div>
-        ${isMe ? '<div class="you-badge">شما</div>' : ''}
+        ${isMe ? '<div class="you-tag">You</div>' : ''}
     `;
-    tile.querySelector('.name-text').textContent = name || 'کاربر';
+    tile.querySelector('.name-text').textContent = name || 'User';
     videoGrid.appendChild(tile);
-    return {
-        tile,
-        video: tile.querySelector('video'),
-        dot: tile.querySelector('.dot')
-    };
+    return { tile, video: tile.querySelector('video'), dot: tile.querySelector('.dot') };
 }
 
-function addLocalTile() {
-    const { tile, video, dot } = createTile(myId, userName, true);
-    connections.set(myId, { name: userName, isMe: true, tile, video, dot });
-}
-
-function attachRemoteStream(peerId, stream) {
-    let entry = connections.get(peerId);
-    if (!entry) {
-        const { tile, video, dot } = createTile(peerId, 'کاربر', false);
-        entry = { name: 'کاربر', isMe: false, tile, video, dot };
-        connections.set(peerId, entry);
-    }
+function attachStream(peerId, stream) {
+    const entry = ensureTile(peerId);
     entry.video.srcObject = stream;
     entry.tile.classList.add('has-video');
     entry.dot.classList.add('on');
-    connectToPeer(peerId);
+    entry.camOn = true;
+    entry.video.play().catch(() => {});
+    updateMemberPanel();
 }
 
 function removeConnection(peerId) {
     const entry = connections.get(peerId);
     if (entry) {
-        if (entry.video.srcObject) {
-            entry.video.srcObject.getTracks().forEach(t => t.stop());
-        }
         entry.tile.remove();
         connections.delete(peerId);
     }
-    activeCalls.delete(peerId);
+    if (activeCalls.has(peerId)) {
+        try { activeCalls.get(peerId).close(); } catch(e) {}
+        activeCalls.delete(peerId);
+    }
+    updateMemberPanel();
+    if (connections.size <= 1) showEmptyHint();
 }
 
+// ================== Camera ==================
 async function startCamera() {
     try {
-        statusMsg.textContent = 'در حال اتصال به وبکم...';
+        toggleBtn.disabled = true;
+        toggleText.textContent = 'Starting...';
+        statusMsg.textContent = 'Requesting camera access...';
+        statusMsg.classList.remove('error-text');
+
         localStream = await navigator.mediaDevices.getUserMedia({
             video: { width: { ideal: 1280 }, height: { ideal: 720 } },
             audio: false
@@ -306,6 +738,8 @@ async function startCamera() {
             me.video.srcObject = localStream;
             me.tile.classList.add('has-video');
             me.dot.classList.add('on');
+            me.camOn = true;
+            me.video.play().catch(()=>{});
         }
 
         for (const peerId of connections.keys()) {
@@ -313,14 +747,21 @@ async function startCamera() {
             callPeer(peerId);
         }
 
-        toggleText.textContent = 'خاموش کردن وبکم';
-        toggleIcon.textContent = '🔴';
+        if (socket) socket.emit('cam-status', { camOn: true });
+
+        toggleText.textContent = 'Stop Camera';
         toggleBtn.classList.add('off');
-        statusMsg.textContent = '✅ وبکم روشن است.';
+        camIcon.innerHTML = '<path d="M1 1l22 22"/><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>';
+        toggleBtn.disabled = false;
+        statusMsg.textContent = 'Camera is live.';
+        updateMemberPanel();
     } catch (err) {
-        statusMsg.textContent = '❌ ' + err.message;
-        if (err.name === 'NotAllowedError') statusMsg.textContent = '❌ دسترسی رد شد.';
-        else if (err.name === 'NotFoundError') statusMsg.textContent = '❌ وبکمی نیست.';
+        toggleBtn.disabled = false;
+        toggleText.textContent = 'Start Camera';
+        statusMsg.textContent = 'Camera access denied or unavailable.';
+        statusMsg.classList.add('error-text');
+        if (err.name === 'NotAllowedError') statusMsg.textContent = 'Camera permission denied. Check browser settings.';
+        else if (err.name === 'NotFoundError') statusMsg.textContent = 'No camera found on this device.';
         stopCamera(false);
     }
 }
@@ -337,9 +778,10 @@ function stopCamera(updateUI = true) {
         me.video.srcObject = null;
         me.tile.classList.remove('has-video');
         me.dot.classList.remove('on');
+        me.camOn = false;
     }
 
-    for (const call of activeCalls.values()) {
+    for (const [pid, call] of activeCalls) {
         try { call.close(); } catch(e) {}
     }
     activeCalls.clear();
@@ -349,13 +791,18 @@ function stopCamera(updateUI = true) {
         entry.video.srcObject = null;
         entry.tile.classList.remove('has-video');
         entry.dot.classList.remove('on');
+        entry.camOn = false;
     }
 
+    if (socket) socket.emit('cam-status', { camOn: false });
+
     if (updateUI) {
-        toggleText.textContent = 'روشن کردن وبکم';
-        toggleIcon.textContent = '📷';
+        toggleText.textContent = 'Start Camera';
         toggleBtn.classList.remove('off');
-        statusMsg.textContent = 'وبکم خاموش است';
+        camIcon.innerHTML = '<path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>';
+        statusMsg.textContent = 'Camera is off.';
+        statusMsg.classList.remove('error-text');
+        updateMemberPanel();
     }
 }
 
@@ -363,51 +810,102 @@ toggleBtn.addEventListener('click', () => {
     isCamOn ? stopCamera() : startCamera();
 });
 
+// ================== Calls ==================
 function callPeer(peerId) {
-    if (!localStream || !peer) return;
+    if (!localStream || !peer || peerId === myId) return;
     if (activeCalls.has(peerId)) return;
+
     const call = peer.call(peerId, localStream);
     if (!call) return;
     activeCalls.set(peerId, call);
-    call.on('stream', (s) => attachRemoteStream(peerId, s));
-    call.on('close', () => removeConnection(peerId));
+    call.on('stream', (remoteStream) => attachStream(peerId, remoteStream));
+    call.on('close', () => {
+        activeCalls.delete(peerId);
+        const entry = connections.get(peerId);
+        if (entry && !entry.isMe) {
+            entry.video.srcObject = null;
+            entry.tile.classList.remove('has-video');
+            entry.dot.classList.remove('on');
+            entry.camOn = false;
+        }
+    });
+    call.on('error', (e) => console.warn('Call error:', e));
 }
 
+// ================== DataChannel ==================
 function connectToPeer(peerId) {
-    if (!peer) return;
-    if (connections.get(peerId)?.conn) return;
+    if (!peer || peerId === myId) return;
+    const entry = connections.get(peerId);
+    if (entry && entry.conn) return;
     const conn = peer.connect(peerId, { reliable: true });
-    setupDataConnection(conn);
+    setupDataConn(conn);
 }
 
-function setupDataConnection(conn) {
+function setupDataConn(conn) {
+    const peerId = conn.peer;
     conn.on('open', () => {
-        conn.send({ type: 'name', name: userName, camOn: isCamOn });
+        conn.send({ type: 'name', name: userName });
+        const entry = connections.get(peerId);
+        if (entry) entry.conn = conn;
     });
     conn.on('data', (data) => {
         if (data.type === 'name') {
-            const peerId = conn.peer;
-            const entry = connections.get(peerId);
-            if (entry) {
-                entry.name = data.name;
-                entry.tile.querySelector('.name-text').textContent = data.name;
-                entry.conn = conn;
-            } else {
-                const { tile, video, dot } = createTile(peerId, data.name, false);
-                connections.set(peerId, {
-                    name: data.name, isMe: false, tile, video, dot, conn
-                });
-            }
-            if (isCamOn && localStream && !activeCalls.has(peerId)) {
-                callPeer(peerId);
-            }
+            const entry = ensureTile(peerId, data.name);
+            entry.name = data.name;
+            entry.tile.querySelector('.name-text').textContent = data.name;
+            updateMemberPanel();
         }
     });
-    conn.on('close', () => removeConnection(conn.peer));
+    conn.on('close', () => {
+        const entry = connections.get(peerId);
+        if (entry) entry.conn = null;
+    });
 }
 
+// ================== Members Panel ==================
+function renderMemberList(list) {
+    memberList.innerHTML = '';
+    memberCount.textContent = list.length;
+    list.forEach(m => {
+        const isMe = m.peerId === myId;
+        const item = document.createElement('div');
+        item.className = 'member-item' + (isMe ? ' me' : '');
+        item.innerHTML = `
+            <div class="member-avatar">${(m.name || '?').charAt(0).toUpperCase()}</div>
+            <div class="member-name">${m.name || 'User'}${isMe ? '<span class="you-label">(you)</span>' : ''}</div>
+            <div class="member-status ${m.camOn ? 'cam-on' : ''}"></div>
+        `;
+        memberList.appendChild(item);
+    });
+}
+
+function updateMemberPanel() {
+    const list = [];
+    for (const [peerId, entry] of connections) {
+        list.push({ peerId, name: entry.name, camOn: entry.camOn });
+    }
+    renderMemberList(list);
+}
+
+// ================== Empty hint ==================
+function showEmptyHint() {
+    if (connections.size <= 1 && !document.getElementById('emptyHint')) {
+        const el = document.createElement('div');
+        el.id = 'emptyHint';
+        el.className = 'empty-state';
+        el.innerHTML = '<div class="icon">👥</div><p>Waiting for others to join...</p>';
+        videoGrid.appendChild(el);
+    }
+}
+function hideEmptyHint() {
+    const el = document.getElementById('emptyHint');
+    if (el) el.remove();
+}
+
+// ================== Leave ==================
 window.addEventListener('beforeunload', () => {
     stopCamera(false);
+    if (socket) socket.disconnect();
     if (peer) { try { peer.destroy(); } catch(e) {} }
 });
 </script>
