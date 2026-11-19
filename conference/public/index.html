@@ -1563,16 +1563,200 @@ function removePeer(peerId) {
 ========================================= */
 
 function setupSocket() {
-    socket = io({
-        transports: ["websocket", "polling"],
+    
+function setupSocket() {
+    socket = io(window.location.origin, {
+        path: "/socket.io/",
+        transports: ["polling", "websocket"],
         upgrade: true,
-        rememberUpgrade: true,
+        rememberUpgrade: false,
+
         reconnection: true,
         reconnectionAttempts: Infinity,
         reconnectionDelay: 2000,
         reconnectionDelayMax: 10000,
-        timeout: 20000
+        timeout: 20000,
+
+        forceNew: true
     });
+
+    socket.on("connect", () => {
+        console.log("[Socket.IO] Connected:", socket.id);
+        console.log(
+            "[Socket.IO] Initial transport:",
+            socket.io.engine.transport.name
+        );
+
+        socket.emit("join", {
+            room: roomName,
+            peerId: myId,
+            userId,
+            name: userName
+        });
+
+        socket.io.engine.on("upgrade", transport => {
+            console.log(
+                "[Socket.IO] Upgraded transport:",
+                transport.name
+            );
+        });
+    });
+
+    socket.on("connect_error", error => {
+        console.error("[Socket.IO] Connection error:", error.message);
+        setStatus("Could not connect to the room server.", true);
+    });
+
+    socket.on("disconnect", reason => {
+        console.warn("[Socket.IO] Disconnected:", reason);
+    });
+
+    socket.on("join-error", payload => {
+        setStatus(payload?.message || "Could not join the room.", true);
+    });
+
+    socket.on("others", others => {
+        if (!Array.isArray(others)) return;
+
+        others.forEach(member => {
+            if (!member?.peerId || member.peerId === myId) return;
+
+            remoteMembers.set(member.userId || member.peerId, {
+                ...member,
+                userId: member.userId || member.peerId
+            });
+
+            createVideoTile(
+                member.peerId,
+                member.name || "Participant"
+            );
+
+            if (isCamOn && shareStream) {
+                setTimeout(() => callPeer(member.peerId), 300);
+            }
+        });
+
+        renderMembers();
+        renderLeaderboard();
+    });
+
+    socket.on("peer-joined", member => {
+        if (!member?.peerId || member.peerId === myId) return;
+
+        remoteMembers.set(member.userId || member.peerId, {
+            ...member,
+            userId: member.userId || member.peerId
+        });
+
+        createVideoTile(
+            member.peerId,
+            member.name || "Participant"
+        );
+
+        if (isCamOn && shareStream) {
+            setTimeout(() => callPeer(member.peerId), 300);
+        }
+
+        renderMembers();
+        renderLeaderboard();
+    });
+
+    socket.on("peer-left", member => {
+        if (!member) return;
+
+        removePeer(member.peerId);
+
+        if (member.userId) {
+            remoteMembers.delete(member.userId);
+        }
+
+        renderMembers();
+        renderLeaderboard();
+    });
+
+    socket.on("peer-cam-status", payload => {
+        if (!payload) return;
+
+        const member = [...remoteMembers.values()]
+            .find(item => item.peerId === payload.peerId);
+
+        if (member) {
+            member.camOn = payload.camOn === true;
+        }
+
+        const dot = document.getElementById(`dot-${payload.peerId}`);
+
+        if (dot) {
+            dot.classList.toggle("on", payload.camOn === true);
+        }
+
+        renderMembers();
+    });
+
+    socket.on("peer-study-status", payload => {
+        if (!payload) return;
+
+        const member = remoteMembers.get(payload.userId);
+
+        if (member) {
+            member.studying = payload.studying === true;
+        }
+
+        renderMembers();
+    });
+
+    socket.on("member-list", members => {
+        if (!Array.isArray(members)) return;
+
+        members.forEach(member => {
+            if (!member?.userId || member.userId === userId) return;
+
+            const old = remoteMembers.get(member.userId) || {};
+
+            remoteMembers.set(member.userId, {
+                ...old,
+                ...member
+            });
+
+            if (member.peerId) {
+                createVideoTile(
+                    member.peerId,
+                    member.name || "Participant"
+                );
+            }
+        });
+
+        const activeIds = new Set(
+            members
+                .filter(member => member.userId !== userId)
+                .map(member => member.userId)
+        );
+
+        for (const id of remoteMembers.keys()) {
+            if (!activeIds.has(id)) {
+                const member = remoteMembers.get(id);
+
+                if (member?.peerId) {
+                    removePeer(member.peerId);
+                }
+
+                remoteMembers.delete(id);
+            }
+        }
+
+        renderMembers();
+        renderLeaderboard();
+    });
+
+    socket.on("study-profile-request", () => {
+        sendMyProfile();
+    });
+
+    socket.on("study-profile", payload => {
+        receiveProfile(payload);
+    });
+}
+
 
     socket.on("connect", () => {
         socket.emit("join", {

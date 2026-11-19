@@ -13,17 +13,23 @@ const server = http.createServer(app);
 // SOCKET.IO SERVER
 // =====================================
 
+
 const io = new Server(server, {
     cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
+        origin: "*",
+        methods: ["GET", "POST"]
     },
-    // هر دو transport مجاز — polling اول، بعد upgrade به websocket
-    transports: ['polling', 'websocket'],
+
+    transports: ["polling", "websocket"],
+
     allowUpgrades: true,
+
     upgradeTimeout: 10000,
+
     maxHttpBufferSize: 64 * 1024,
+
     perMessageDeflate: false,
+
     pingInterval: 25000,
     pingTimeout: 20000
 });
