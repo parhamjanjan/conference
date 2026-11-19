@@ -282,6 +282,7 @@ button { color: inherit; }
     height: 100%;
     object-fit: cover;
     background: #080911;
+    image-rendering: pixelated;
 }
 
 .video-tile canvas.enhanced-video {
@@ -292,6 +293,7 @@ button { color: inherit; }
     object-fit: cover;
     background: #000;
     display: none;
+    image-rendering: pixelated;
 }
 
 .video-tile.enhanced canvas.enhanced-video { display: block; }
@@ -548,17 +550,13 @@ button { color: inherit; }
     border-radius: 50%;
     background: #64748b;
     box-shadow: 0 0 0 5px rgba(100,116,139,.1);
+    transition: .2s ease;
 }
 
 .study-indicator.active {
     background: var(--green);
     box-shadow: 0 0 0 5px rgba(16,185,129,.12), 0 0 18px rgba(16,185,129,.6);
     animation: pulse 1.8s infinite;
-}
-
-.study-indicator.distracted {
-    background: var(--gold);
-    box-shadow: 0 0 0 5px rgba(251,191,36,.12), 0 0 18px rgba(251,191,36,.5);
 }
 
 #studyStateText { font-size: 13px; font-weight: 750; }
@@ -666,70 +664,6 @@ button { color: inherit; }
 
 #statusMsg.error-text { color: var(--red); }
 
-/* Presence video */
-.face-analysis-video {
-    position: fixed;
-    width: 180px;
-    height: 135px;
-    bottom: 16px;
-    right: 16px;
-    border-radius: 14px;
-    border: 2px solid var(--accent);
-    object-fit: cover;
-    background: #000;
-    z-index: 9998;
-    transform: scaleX(-1);
-    box-shadow: 0 10px 35px rgba(0,0,0,0.5);
-    transition: opacity .2s ease;
-}
-
-@media (max-width: 600px) {
-    .face-analysis-video {
-        width: 110px;
-        height: 82px;
-        bottom: 8px;
-        right: 8px;
-    }
-}
-
-/* PiP timer widget */
-#pipTimerWidget {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    z-index: 9999;
-    display: none;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    border-radius: 14px;
-    background: rgba(16,185,129,.95);
-    color: white;
-    font-weight: 800;
-    font-size: 16px;
-    font-variant-numeric: tabular-nums;
-    box-shadow: 0 10px 40px rgba(16,185,129,.4);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,.2);
-    transition: transform .2s ease;
-    pointer-events: none;
-}
-
-#pipTimerWidget.visible { display: flex; }
-
-#pipTimerWidget .pip-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: white;
-    animation: pipPulse 1.5s infinite;
-}
-
-@keyframes pipPulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: .5; transform: scale(.85); }
-}
-
 @keyframes pulse { 50% { opacity: .55; } }
 
 @keyframes enter {
@@ -745,7 +679,6 @@ button { color: inherit; }
     .control-button { flex: 1 1 145px; min-width: 0; }
     .study-panel, .leaderboard-panel { padding: 15px; }
     .study-timer { font-size: 22px; }
-    #pipTimerWidget { top: 8px; right: 8px; font-size: 14px; padding: 10px 14px; }
 }
 
 @media(prefers-reduced-motion: reduce) {
@@ -786,7 +719,6 @@ button { color: inherit; }
                    autocomplete="current-password">
             <small class="field-hint">
                 Use the same password to access the same study identity on another device.
-                This is a personal-project identity key, not secure account authentication.
             </small>
         </div>
 
@@ -844,15 +776,6 @@ button { color: inherit; }
                     </svg>
                     <span id="toggleText">Share Camera</span>
                 </button>
-
-                <button id="pipBtn" class="control-button" style="background: linear-gradient(120deg, #7c3aed, #a78bfa); display:none;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="4" width="20" height="16" rx="2"/>
-                        <rect x="12" y="12" width="8" height="6" rx="1" fill="currentColor"/>
-                    </svg>
-                    <span id="pipBtnText">Mini Timer</span>
-                </button>
             </div>
 
             <section class="study-panel glass">
@@ -861,7 +784,7 @@ button { color: inherit; }
                     <div>
                         <div id="studyStateText">Study session inactive</div>
                         <div class="study-subtitle" id="presenceText">
-                            Start studying to activate presence detection
+                            Start studying to begin recording your time
                         </div>
                     </div>
                 </div>
@@ -899,52 +822,28 @@ button { color: inherit; }
     </main>
 </div>
 
-<!-- Presence video -->
-<video id="presenceVideo" class="face-analysis-video" autoplay muted playsinline></video>
-
-<!-- Floating PiP timer widget -->
-<div id="pipTimerWidget">
-    <span class="pip-dot"></span>
-    <span id="pipTimerText">00:00:00</span>
-</div>
-
 <script type="module">
-import {
-    FilesetResolver,
-    FaceLandmarker
-} from "/mediapipe/vision_bundle.mjs";
 
 /* =========================================
-   LOW-DATA PROFILE
+   LOW-DATA PROFILE — بهینه‌ترین تنظیمات WebRTC
 ========================================= */
 
-// کیفیت ارسال WebRTC — ۱۶۰×۹۰، ۱ فریم بر ثانیه، حداکثر ۸ کیلوبیت بر ثانیه
+// حداقل کیفیت ممکن برای دیده شدن چهره‌ها — ۱۶۰×۹۰، ۱ فریم بر ثانیه، سقف ۸ kbps
 const VIDEO_SEND_PROFILE = {
     width: 160,
     height: 90,
     fps: 1,
-    maxBitrate: 8000        // bits per second — hard cap on each sender
-};
-
-// فریم ریت درخواستی از دوربین برای MediaPipe (محلی، روی اینترنت اثر ندارد)
-const CAMERA_CAPTURE_PROFILE = {
-    width: 320,
-    height: 240,
-    fps: 10
+    maxBitrate: 8000       // bits/second — hard cap per sender
 };
 
 // فاصله‌ی heartbeat/پروفایل — از ۱۵ ثانیه به ۶۰ ثانیه
 const PROFILE_SYNC_INTERVAL = 60000;
 
-// فاصله‌ی detection — از ۴۰۰ms به ۸۰۰ms
-const DETECT_INTERVAL_MS = 800;
-
 // فاصله‌ی clock tick
 const CLOCK_TICK_MS = 1000;
 
-// مسیرهای محلی MediaPipe
-const MEDIAPIPE_WASM_PATH = "/mediapipe/wasm";
-const FACE_LANDMARKER_MODEL_PATH = "/mediapipe/face_landmarker.task";
+// حداکثر gap قابل قبول (بیشتر از این یعنی sleep/resume — نادیده بگیر)
+const MAX_TICK_GAP_MS = 5000;
 
 // تنظیمات کیفیت بصری سمت گیرنده (بدون مصرف اینترنت اضافی)
 const ENHANCEMENT_ENABLED = true;
@@ -969,17 +868,12 @@ const toggleBtn = $("toggleBtn");
 const toggleText = $("toggleText");
 const studyBtn = $("studyBtn");
 const studyBtnText = $("studyBtnText");
-const pipBtn = $("pipBtn");
-const pipBtnText = $("pipBtnText");
 const studyTimer = $("studyTimer");
 const studyIndicator = $("studyIndicator");
 const studyStateText = $("studyStateText");
 const presenceText = $("presenceText");
 const leaderboardList = $("leaderboardList");
 const statusMsg = $("statusMsg");
-const presenceVideo = $("presenceVideo");
-const pipTimerWidget = $("pipTimerWidget");
-const pipTimerText = $("pipTimerText");
 
 /* =========================================
    STATE
@@ -993,39 +887,18 @@ let userId = "";
 let userName = "";
 let roomName = "";
 
-let cameraStream = null;
 let shareStream = null;
-
 let isCamOn = false;
 let isStudying = false;
-let isPresent = false;
 
-let faceLandmarker = null;
-let detectionLoop = false;
-let detectionBusy = false;
 let lastSaveTime = 0;
 
-let detectTimestamp = 0;
-let lastFrameTime = 0;
-let frameCount = 0;
-let detectionErrorShown = false;
-
-const FACE_LOST_GRACE_MS = 1800;
-let faceLostSince = 0;
-
-const STATE_STABILITY_MS = 1500;
-let candidateState = "away";
-let candidateStateSince = 0;
-
-let latestConfidence = 0;
-
-let selectedPeriod = "today";
-
+// Study clock — کاملاً مستقل، مقاوم به مینیمایز
 let studyClockInterval = null;
 let lastTickTime = 0;
-let fractionalMs = 0;
+let pendingSeconds = 0;
 
-let pipActive = false;
+let selectedPeriod = "today";
 
 const outgoingCalls = new Map();
 const incomingCalls = new Map();
@@ -1202,7 +1075,6 @@ function receiveProfile(payload) {
    CANVAS ENHANCEMENT (بدون مصرف اینترنت اضافی)
 ========================================= */
 
-// شبیه‌سازی unsharp mask برای بهبود کیفیت ادراکی
 function startEnhancement(tile, video, peerId) {
     if (!ENHANCEMENT_ENABLED) return;
     if (enhancementMap.has(peerId)) return;
@@ -1222,7 +1094,7 @@ function startEnhancement(tile, video, peerId) {
     const render = (now) => {
         if (!enhancementMap.has(peerId)) return;
 
-        if (video.readyState >= 2 && now - state.lastDraw >= 250) {
+        if (video.readyState >= 2 && now - state.lastDraw >= 200) {
             state.lastDraw = now;
 
             const w = VIDEO_SEND_PROFILE.width;
@@ -1240,7 +1112,6 @@ function startEnhancement(tile, video, peerId) {
                 const frame = state.scratchCtx.getImageData(0, 0, w, h);
                 const src = frame.data;
                 const dst = new Uint8ClampedArray(src);
-                // kernel 3×3 unsharp mask ملایم
                 const k = [0, -0.15, 0, -0.15, 1.6, -0.15, 0, -0.15, 0];
 
                 for (let y = 1; y < h - 1; y++) {
@@ -1265,7 +1136,6 @@ function startEnhancement(tile, video, peerId) {
                 ctx.imageSmoothingQuality = "high";
                 ctx.drawImage(scratch, 0, 0, canvas.width, canvas.height);
             } catch (e) {
-                // در صورت خطا، enhancement را متوقف کن
                 stopEnhancement(peerId);
                 return;
             }
@@ -1369,7 +1239,6 @@ function setTileStream(id, stream) {
     video.play().catch(() => {});
     tile.classList.add("has-video");
 
-    // فقط برای streamهای ریموت enhancement اعمال کن
     const isLocal = (id === myId);
     if (!isLocal) {
         startEnhancement(tile, video, id);
@@ -1507,50 +1376,7 @@ document.querySelectorAll(".period-tab").forEach(button => {
 });
 
 /* =========================================
-   CAMERA (Presence)
-========================================= */
-
-async function ensureCameraStream() {
-    if (cameraStream && cameraStream.getVideoTracks().some(t => t.readyState === "live")) {
-        return cameraStream;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("Camera access is unavailable. Use HTTPS or localhost.");
-    }
-
-    cameraStream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-            width: { ideal: CAMERA_CAPTURE_PROFILE.width },
-            height: { ideal: CAMERA_CAPTURE_PROFILE.height },
-            frameRate: { ideal: CAMERA_CAPTURE_PROFILE.fps },
-            facingMode: "user"
-        }
-    });
-
-    presenceVideo.srcObject = cameraStream;
-
-    try {
-        await presenceVideo.play();
-    } catch (e) {
-        console.warn("presenceVideo.play() failed:", e);
-    }
-
-    return cameraStream;
-}
-
-function releaseCameraIfUnused() {
-    if (isStudying) return;
-    if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-        cameraStream = null;
-    }
-    presenceVideo.srcObject = null;
-}
-
-/* =========================================
-   CAMERA (Sharing — very low bitrate)
+   CAMERA SHARING — very low bitrate
 ========================================= */
 
 async function ensureShareStream() {
@@ -1558,27 +1384,19 @@ async function ensureShareStream() {
         return shareStream;
     }
 
-    try {
-        shareStream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: {
-                width: { ideal: VIDEO_SEND_PROFILE.width, max: VIDEO_SEND_PROFILE.width },
-                height: { ideal: VIDEO_SEND_PROFILE.height, max: VIDEO_SEND_PROFILE.height },
-                frameRate: { ideal: VIDEO_SEND_PROFILE.fps, max: VIDEO_SEND_PROFILE.fps },
-                facingMode: "user"
-            }
-        });
-    } catch (primaryError) {
-        console.warn("Independent getUserMedia failed, falling back to clone:", primaryError);
-        await ensureCameraStream();
-        const liveTracks = cameraStream.getVideoTracks()
-            .filter(t => t.readyState === "live");
-        if (!liveTracks.length) {
-            throw new Error("No live video track available.");
-        }
-        const cloned = liveTracks.map(t => t.clone());
-        shareStream = new MediaStream(cloned);
+    if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera access is unavailable. Use HTTPS or localhost.");
     }
+
+    shareStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+            width: { ideal: VIDEO_SEND_PROFILE.width, max: VIDEO_SEND_PROFILE.width },
+            height: { ideal: VIDEO_SEND_PROFILE.height, max: VIDEO_SEND_PROFILE.height },
+            frameRate: { ideal: VIDEO_SEND_PROFILE.fps, max: VIDEO_SEND_PROFILE.fps },
+            facingMode: "user"
+        }
+    });
 
     if (!shareStream.getVideoTracks().some(t => t.readyState === "live")) {
         throw new Error("Camera produced no live video track.");
@@ -1587,7 +1405,6 @@ async function ensureShareStream() {
     return shareStream;
 }
 
-// سقف سخت روی bitrate هر sender
 async function applyBitrateCap(call) {
     const apply = async () => {
         try {
@@ -1615,7 +1432,6 @@ async function applyBitrateCap(call) {
         }
     };
 
-    // PeerJS ممکن است senderها را دیرتر بسازد
     setTimeout(apply, 250);
     setTimeout(apply, 1000);
     setTimeout(apply, 2500);
@@ -1646,7 +1462,7 @@ async function startCameraSharing() {
             if (member.peerId) callPeer(member.peerId);
         }
 
-        setStatus("Camera sharing started (low-data mode: 160×90, 1 fps, ~8 kbps).");
+        setStatus("Camera sharing started (low-data mode: 160×90, 1 fps).");
     } catch (error) {
         console.error(error);
         isCamOn = false;
@@ -1665,7 +1481,6 @@ function stopCameraSharing() {
     setTileStream(myId, null);
     updateCameraButton();
     updateMyCameraStatus();
-    releaseCameraIfUnused();
     setStatus("Camera sharing stopped.");
 }
 
@@ -1744,12 +1559,12 @@ function removePeer(peerId) {
 }
 
 /* =========================================
-   SOCKET.IO (WebSocket first)
+   SOCKET.IO
 ========================================= */
 
 function setupSocket() {
     socket = io({
-        transports: ["websocket", "polling"],  // websocket اول
+        transports: ["websocket", "polling"],
         upgrade: true,
         rememberUpgrade: true,
         reconnection: true,
@@ -1867,90 +1682,33 @@ function setupSocket() {
 }
 
 /* =========================================
-   MEDIAPIPE
-========================================= */
-
-async function initializeFaceLandmarker() {
-    if (faceLandmarker) return faceLandmarker;
-
-    try {
-        const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_PATH);
-        faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-            baseOptions: {
-                modelAssetPath: FACE_LANDMARKER_MODEL_PATH,
-                delegate: "CPU"
-            },
-            runningMode: "VIDEO",
-            numFaces: 1,
-            outputFaceBlendshapes: true,
-            minFaceDetectionConfidence: 0.5,
-            minFacePresenceConfidence: 0.5,
-            minTrackingConfidence: 0.5
-        });
-        console.log("FaceLandmarker (local) ready.");
-        return faceLandmarker;
-    } catch (error) {
-        console.error("Failed to initialize local FaceLandmarker:", error);
-        throw new Error(
-            "Could not load MediaPipe locally. " +
-            "Make sure /mediapipe/face_landmarker.task and " +
-            "/mediapipe/wasm/* files exist."
-        );
-    }
-}
-
-function analyzeFaceResult(result) {
-    const landmarks = result?.faceLandmarks?.[0];
-    if (!landmarks) return { state: "away", confidence: 0 };
-
-    const leftEyeOuter = landmarks[33];
-    const leftEyeInner = landmarks[133];
-    const rightEyeInner = landmarks[362];
-    const rightEyeOuter = landmarks[263];
-    const nose = landmarks[1];
-
-    if (!leftEyeOuter || !leftEyeInner || !rightEyeInner || !rightEyeOuter || !nose) {
-        return { state: "distracted", confidence: 0.3 };
-    }
-
-    const leftEyeCenterX = (leftEyeOuter.x + leftEyeInner.x) / 2;
-    const rightEyeCenterX = (rightEyeInner.x + rightEyeOuter.x) / 2;
-    const eyeCenterX = (leftEyeCenterX + rightEyeCenterX) / 2;
-    const eyeDistance = Math.abs(rightEyeCenterX - leftEyeCenterX);
-
-    if (eyeDistance < 0.01) return { state: "distracted", confidence: 0.3 };
-
-    const normalizedOffset = Math.abs(nose.x - eyeCenterX) / eyeDistance;
-    if (normalizedOffset > 0.75) {
-        return { state: "distracted", confidence: Math.min(1, normalizedOffset / 1.5) };
-    }
-    return { state: "focused", confidence: 0.9 };
-}
-
-/* =========================================
-   STUDY CLOCK
+   STUDY CLOCK — مقاوم به مینیمایز
 ========================================= */
 
 function startStudyClock() {
     stopStudyClock();
     lastTickTime = Date.now();
-    fractionalMs = 0;
+    pendingSeconds = 0;
 
     studyClockInterval = setInterval(() => {
-        if (!isStudying || !isPresent) {
+        if (!isStudying) {
             lastTickTime = Date.now();
             return;
         }
+
         const now = Date.now();
         const delta = now - lastTickTime;
         lastTickTime = now;
 
-        if (delta > 5000 || delta < 0) return;
+        // اگر gap خیلی بزرگ بود (sleep/resume)، نادیده بگیر
+        if (delta <= 0 || delta > MAX_TICK_GAP_MS) return;
 
-        fractionalMs += delta;
-        const fullSeconds = Math.floor(fractionalMs / 1000);
+        pendingSeconds += delta;
+
+        // هر ۱۰۰۰ms، ثانیه‌ی کامل را اضافه کن
+        const fullSeconds = Math.floor(pendingSeconds / 1000);
         if (fullSeconds > 0) {
-            fractionalMs -= fullSeconds * 1000;
+            pendingSeconds -= fullSeconds * 1000;
             addStudySeconds(fullSeconds);
         }
     }, CLOCK_TICK_MS);
@@ -1961,7 +1719,7 @@ function stopStudyClock() {
         clearInterval(studyClockInterval);
         studyClockInterval = null;
     }
-    fractionalMs = 0;
+    pendingSeconds = 0;
     lastTickTime = 0;
 }
 
@@ -1972,243 +1730,9 @@ function addStudySeconds(seconds) {
         Number(ownStats.days[today] || 0) + seconds
     );
     const total = getPeriodSeconds(ownStats.days, "all");
-    const formatted = formatTime(total);
-    studyTimer.textContent = formatted;
-    if (pipActive) pipTimerText.textContent = formatted;
+    studyTimer.textContent = formatTime(total);
     renderLeaderboard();
 }
-
-/* =========================================
-   STATE STABILITY
-========================================= */
-
-function updateStableStudyState(nextState) {
-    const now = performance.now();
-
-    if (nextState !== candidateState) {
-        candidateState = nextState;
-        candidateStateSince = now;
-        return;
-    }
-
-    const stableDuration = now - candidateStateSince;
-    if (stableDuration < STATE_STABILITY_MS) return;
-
-    const nextPresent = (candidateState === "focused");
-    if (isPresent === nextPresent) return;
-
-    isPresent = nextPresent;
-
-    if (candidateState === "focused") {
-        studyIndicator.classList.add("active");
-        studyIndicator.classList.remove("distracted");
-        presenceText.textContent = "You are present · Time is being recorded";
-    } else if (candidateState === "distracted") {
-        studyIndicator.classList.remove("active");
-        studyIndicator.classList.add("distracted");
-        presenceText.textContent = "Head turned away — look at the screen";
-    } else {
-        studyIndicator.classList.remove("active", "distracted");
-        presenceText.textContent = "Waiting for your presence...";
-    }
-}
-
-/* =========================================
-   DETECTION LOOP
-========================================= */
-
-function detectionTick() {
-    if (!detectionLoop || !isStudying) return;
-
-    if (detectionBusy) {
-        setTimeout(detectionTick, DETECT_INTERVAL_MS);
-        return;
-    }
-
-    if (!faceLandmarker) {
-        setTimeout(detectionTick, DETECT_INTERVAL_MS);
-        return;
-    }
-
-    const video = presenceVideo;
-    if (!video || video.readyState < 2) {
-        presenceText.textContent = "Waiting for camera frames...";
-        setTimeout(detectionTick, DETECT_INTERVAL_MS);
-        return;
-    }
-
-    if (video.currentTime === lastFrameTime) {
-        if (!detectionErrorShown) {
-            console.warn("Video not producing new frames:", {
-                currentTime: video.currentTime,
-                readyState: video.readyState,
-                paused: video.paused
-            });
-        }
-        setTimeout(detectionTick, 100);
-        return;
-    }
-
-    lastFrameTime = video.currentTime;
-    detectionBusy = true;
-    frameCount++;
-
-    try {
-        detectTimestamp = Math.max(
-            detectTimestamp + 1,
-            Math.round(video.currentTime * 1000)
-        );
-
-        const result = faceLandmarker.detectForVideo(video, detectTimestamp);
-        const faceCount = result?.faceLandmarks?.length || 0;
-
-        if (frameCount <= 10 || frameCount % 30 === 0) {
-            console.log("Detection frame:", {
-                frame: frameCount,
-                currentTime: video.currentTime.toFixed(2),
-                readyState: video.readyState,
-                faceCount,
-                timestamp: detectTimestamp
-            });
-        }
-
-        if (faceCount === 0) {
-            if (!faceLostSince) faceLostSince = performance.now();
-            if (performance.now() - faceLostSince >= FACE_LOST_GRACE_MS) {
-                updateStableStudyState("away");
-                latestConfidence = 0;
-            }
-        } else {
-            faceLostSince = 0;
-            const analysis = analyzeFaceResult(result);
-            latestConfidence = analysis.confidence;
-            updateStableStudyState(analysis.state);
-        }
-
-        if (Date.now() - lastSaveTime > 5000) {
-            saveOwnStats();
-            sendMyProfile();
-            lastSaveTime = Date.now();
-        }
-    } catch (error) {
-        console.error("Detection error:", error);
-        if (!detectionErrorShown) {
-            detectionErrorShown = true;
-            presenceText.textContent = "Detection error — check console";
-        }
-    } finally {
-        detectionBusy = false;
-        setTimeout(detectionTick, DETECT_INTERVAL_MS);
-    }
-}
-
-async function startPresenceDetection() {
-    await ensureCameraStream();
-
-    try {
-        if (presenceVideo.paused) await presenceVideo.play();
-    } catch (e) {
-        console.warn("presenceVideo.play() failed:", e);
-    }
-
-    await new Promise((resolve, reject) => {
-        if (presenceVideo.readyState >= 2) return resolve();
-        const timeout = setTimeout(
-            () => reject(new Error("Video metadata not ready after 5s")),
-            5000
-        );
-        presenceVideo.addEventListener("loadeddata", () => {
-            clearTimeout(timeout);
-            resolve();
-        }, { once: true });
-    });
-
-    await initializeFaceLandmarker();
-
-    detectionLoop = true;
-    lastFrameTime = 0;
-    detectTimestamp = 0;
-    faceLostSince = 0;
-    frameCount = 0;
-    detectionErrorShown = false;
-
-    presenceText.textContent = "Camera ready. Detecting your presence...";
-    detectionTick();
-}
-
-function stopPresenceDetection() {
-    detectionLoop = false;
-    isPresent = false;
-    latestConfidence = 0;
-    faceLostSince = 0;
-    candidateState = "away";
-    candidateStateSince = 0;
-    frameCount = 0;
-    detectionErrorShown = false;
-    studyIndicator.classList.remove("active", "distracted");
-
-    if (faceLandmarker) {
-        try { faceLandmarker.close(); } catch {}
-        faceLandmarker = null;
-    }
-
-    releaseCameraIfUnused();
-}
-
-/* =========================================
-   PICTURE-IN-PICTURE
-========================================= */
-
-async function enterPiP() {
-    if (document.pictureInPictureElement) return;
-    if (!presenceVideo.srcObject) {
-        setStatus("Camera is not ready for Mini Timer.", true);
-        return;
-    }
-    try {
-        if (presenceVideo.paused) await presenceVideo.play();
-        await presenceVideo.requestPictureInPicture();
-        pipActive = true;
-        pipBtnText.textContent = "Close Mini Timer";
-        pipTimerWidget.classList.add("visible");
-        pipTimerText.textContent = studyTimer.textContent;
-    } catch (err) {
-        console.warn("PiP failed:", err);
-        setStatus("Mini Timer unavailable in this browser.", true);
-    }
-}
-
-async function exitPiP() {
-    try {
-        if (document.pictureInPictureElement) {
-            await document.exitPictureInPicture();
-        }
-    } catch (err) {
-        console.warn("Exit PiP failed:", err);
-    }
-    pipActive = false;
-    pipBtnText.textContent = "Mini Timer";
-    pipTimerWidget.classList.remove("visible");
-}
-
-presenceVideo.addEventListener("enterpictureinpicture", () => {
-    pipActive = true;
-    pipBtn.style.display = "inline-flex";
-    pipBtnText.textContent = "Close Mini Timer";
-    pipTimerWidget.classList.add("visible");
-    pipTimerText.textContent = studyTimer.textContent;
-});
-
-presenceVideo.addEventListener("leavepictureinpicture", () => {
-    pipActive = false;
-    pipBtnText.textContent = "Mini Timer";
-    pipTimerWidget.classList.remove("visible");
-});
-
-pipBtn.addEventListener("click", async () => {
-    if (pipActive) await exitPiP();
-    else await enterPiP();
-});
 
 /* =========================================
    STUDY SESSION
@@ -2217,10 +1741,13 @@ pipBtn.addEventListener("click", async () => {
 function updateStudyUI() {
     studyBtn.classList.toggle("active", isStudying);
     studyBtnText.textContent = isStudying ? "Stop Studying" : "Start Studying";
+
+    studyIndicator.classList.toggle("active", isStudying);
+
     studyStateText.textContent = isStudying
         ? "Study session active"
         : "Study session inactive";
-    pipBtn.style.display = isStudying ? "inline-flex" : "none";
+
     renderMembers();
 }
 
@@ -2229,8 +1756,6 @@ async function startStudy() {
     studyBtnText.textContent = "Starting...";
 
     try {
-        await startPresenceDetection();
-
         isStudying = true;
         startStudyClock();
         updateStudyUI();
@@ -2239,19 +1764,15 @@ async function startStudy() {
             socket.emit("study-status", { studying: true });
         }
 
-        setStatus("Study session started. Click 'Mini Timer' to enable PiP.");
+        presenceText.textContent = "Time is being recorded · You can minimize this tab";
+        setStatus("Study session started. Time is recording.");
     } catch (error) {
         console.error(error);
-        detectionLoop = false;
         isStudying = false;
         stopStudyClock();
-        releaseCameraIfUnused();
         studyStateText.textContent = "Could not start study session";
-        presenceText.textContent = error.message || "Camera or detection initialization failed.";
-        setStatus(
-            "Could not start presence detection. Check camera permission and connection.",
-            true
-        );
+        presenceText.textContent = error.message || "Unexpected error.";
+        setStatus("Could not start study session.", true);
     } finally {
         studyBtn.disabled = false;
         updateStudyUI();
@@ -2261,8 +1782,6 @@ async function startStudy() {
 async function stopStudy() {
     isStudying = false;
     stopStudyClock();
-    stopPresenceDetection();
-    await exitPiP();
 
     saveOwnStats();
     sendMyProfile();
@@ -2388,24 +1907,14 @@ async function joinRoom() {
 }
 
 /* =========================================
-   VISIBILITY
+   VISIBILITY — فقط برای اطلاع‌رسانی
 ========================================= */
 
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible" && isStudying) {
-        if (!document.pictureInPictureElement) {
-            presenceText.textContent = "Tab hidden — for accurate tracking, keep Mini Timer (PiP) open";
-        } else {
-            presenceText.textContent = "Running in Picture-in-Picture — tracking continues";
-        }
+        presenceText.textContent = "Tab hidden — time is still being recorded";
     } else if (document.visibilityState === "visible" && isStudying) {
-        if (isPresent) {
-            presenceText.textContent = "You are present · Time is being recorded";
-        } else if (candidateState === "distracted") {
-            presenceText.textContent = "Head turned away — look at the screen";
-        } else {
-            presenceText.textContent = "Waiting for your presence...";
-        }
+        presenceText.textContent = "Time is being recorded · You can minimize this tab";
     }
 });
 
@@ -2436,7 +1945,6 @@ window.addEventListener("beforeunload", () => {
     }
     if (socket) socket.disconnect();
     if (shareStream) shareStream.getTracks().forEach(track => track.stop());
-    if (cameraStream) cameraStream.getTracks().forEach(track => track.stop());
     if (peer && !peer.destroyed) {
         try { peer.destroy(); } catch {}
     }
