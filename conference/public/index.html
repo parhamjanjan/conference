@@ -284,7 +284,21 @@ button { color: inherit; }
     background: #080911;
 }
 
-.video-tile.mirror video { transform: scaleX(-1); }
+.video-tile canvas.enhanced-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000;
+    display: none;
+}
+
+.video-tile.enhanced canvas.enhanced-video { display: block; }
+.video-tile.enhanced video { opacity: 0; }
+
+.video-tile.mirror video,
+.video-tile.mirror canvas.enhanced-video { transform: scaleX(-1); }
 
 .placeholder {
     position: absolute;
@@ -652,7 +666,7 @@ button { color: inherit; }
 
 #statusMsg.error-text { color: var(--red); }
 
-/* Presence video — visible so browser keeps rendering frames */
+/* Presence video */
 .face-analysis-video {
     position: fixed;
     width: 180px;
@@ -678,7 +692,7 @@ button { color: inherit; }
     }
 }
 
-/* PiP timer widget overlay */
+/* PiP timer widget */
 #pipTimerWidget {
     position: fixed;
     top: 16px;
@@ -885,7 +899,7 @@ button { color: inherit; }
     </main>
 </div>
 
-<!-- Presence video — visible for reliable frame delivery -->
+<!-- Presence video -->
 <video id="presenceVideo" class="face-analysis-video" autoplay muted playsinline></video>
 
 <!-- Floating PiP timer widget -->
@@ -901,11 +915,39 @@ import {
 } from "/mediapipe/vision_bundle.mjs";
 
 /* =========================================
-   LOCAL MEDIAPIPE PATHS
+   LOW-DATA PROFILE
 ========================================= */
 
+// کیفیت ارسال WebRTC — ۱۶۰×۹۰، ۱ فریم بر ثانیه، حداکثر ۸ کیلوبیت بر ثانیه
+const VIDEO_SEND_PROFILE = {
+    width: 160,
+    height: 90,
+    fps: 1,
+    maxBitrate: 8000        // bits per second — hard cap on each sender
+};
+
+// فریم ریت درخواستی از دوربین برای MediaPipe (محلی، روی اینترنت اثر ندارد)
+const CAMERA_CAPTURE_PROFILE = {
+    width: 320,
+    height: 240,
+    fps: 10
+};
+
+// فاصله‌ی heartbeat/پروفایل — از ۱۵ ثانیه به ۶۰ ثانیه
+const PROFILE_SYNC_INTERVAL = 60000;
+
+// فاصله‌ی detection — از ۴۰۰ms به ۸۰۰ms
+const DETECT_INTERVAL_MS = 800;
+
+// فاصله‌ی clock tick
+const CLOCK_TICK_MS = 1000;
+
+// مسیرهای محلی MediaPipe
 const MEDIAPIPE_WASM_PATH = "/mediapipe/wasm";
 const FACE_LANDMARKER_MODEL_PATH = "/mediapipe/face_landmarker.task";
+
+// تنظیمات کیفیت بصری سمت گیرنده (بدون مصرف اینترنت اضافی)
+const ENHANCEMENT_ENABLED = true;
 
 /* =========================================
    DOM
@@ -963,17 +1005,14 @@ let detectionLoop = false;
 let detectionBusy = false;
 let lastSaveTime = 0;
 
-// Detection state
 let detectTimestamp = 0;
 let lastFrameTime = 0;
 let frameCount = 0;
 let detectionErrorShown = false;
 
-// Grace period
 const FACE_LOST_GRACE_MS = 1800;
 let faceLostSince = 0;
 
-// State stability
 const STATE_STABILITY_MS = 1500;
 let candidateState = "away";
 let candidateStateSince = 0;
@@ -982,7 +1021,6 @@ let latestConfidence = 0;
 
 let selectedPeriod = "today";
 
-// Study clock
 let studyClockInterval = null;
 let lastTickTime = 0;
 let fractionalMs = 0;
@@ -994,13 +1032,13 @@ const incomingCalls = new Map();
 const remoteMembers = new Map();
 const remoteProfiles = new Map();
 
+// canvas enhancement — peerId → { canvas, ctx, raf, source }
+const enhancementMap = new Map();
+
 let ownStats = { version: 1, days: {} };
 
 const STATS_KEY = "focus_hall_stats_";
 const REMOTE_KEY = "focus_hall_remote_profiles";
-const PROFILE_SYNC_INTERVAL = 15000;
-const DETECT_INTERVAL_MS = 400;
-const CLOCK_TICK_MS = 1000;
 
 /* =========================================
    HELPERS
@@ -1161,6 +1199,96 @@ function receiveProfile(payload) {
 }
 
 /* =========================================
+   CANVAS ENHANCEMENT (بدون مصرف اینترنت اضافی)
+========================================= */
+
+// شبیه‌سازی unsharp mask برای بهبود کیفیت ادراکی
+function startEnhancement(tile, video, peerId) {
+    if (!ENHANCEMENT_ENABLED) return;
+    if (enhancementMap.has(peerId)) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.className = "enhanced-video";
+    tile.appendChild(canvas);
+
+    const ctx = canvas.getContext("2d", { alpha: false });
+    const scratch = document.createElement("canvas");
+    const scratchCtx = scratch.getContext("2d", { willReadFrequently: true });
+
+    const state = { canvas, ctx, scratch, scratchCtx, video, raf: 0, lastDraw: 0 };
+    enhancementMap.set(peerId, state);
+    tile.classList.add("enhanced");
+
+    const render = (now) => {
+        if (!enhancementMap.has(peerId)) return;
+
+        if (video.readyState >= 2 && now - state.lastDraw >= 250) {
+            state.lastDraw = now;
+
+            const w = VIDEO_SEND_PROFILE.width;
+            const h = VIDEO_SEND_PROFILE.height;
+
+            if (scratch.width !== w) {
+                scratch.width = w;
+                scratch.height = h;
+                canvas.width = w * 2;
+                canvas.height = h * 2;
+            }
+
+            try {
+                state.scratchCtx.drawImage(video, 0, 0, w, h);
+                const frame = state.scratchCtx.getImageData(0, 0, w, h);
+                const src = frame.data;
+                const dst = new Uint8ClampedArray(src);
+                // kernel 3×3 unsharp mask ملایم
+                const k = [0, -0.15, 0, -0.15, 1.6, -0.15, 0, -0.15, 0];
+
+                for (let y = 1; y < h - 1; y++) {
+                    for (let x = 1; x < w - 1; x++) {
+                        const i = (y * w + x) * 4;
+                        for (let c = 0; c < 3; c++) {
+                            let v = 0, kk = 0;
+                            for (let dy = -1; dy <= 1; dy++) {
+                                for (let dx = -1; dx <= 1; dx++) {
+                                    const p = ((y + dy) * w + (x + dx)) * 4 + c;
+                                    v += src[p] * k[kk++];
+                                }
+                            }
+                            dst[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
+                        }
+                    }
+                }
+                frame.data.set(dst);
+                state.scratchCtx.putImageData(frame, 0, 0);
+
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = "high";
+                ctx.drawImage(scratch, 0, 0, canvas.width, canvas.height);
+            } catch (e) {
+                // در صورت خطا، enhancement را متوقف کن
+                stopEnhancement(peerId);
+                return;
+            }
+        }
+
+        state.raf = requestAnimationFrame(render);
+    };
+
+    state.raf = requestAnimationFrame(render);
+}
+
+function stopEnhancement(peerId) {
+    const state = enhancementMap.get(peerId);
+    if (!state) return;
+    if (state.raf) cancelAnimationFrame(state.raf);
+    if (state.canvas) state.canvas.remove();
+    enhancementMap.delete(peerId);
+
+    const tile = document.getElementById(`tile-${peerId}`);
+    if (tile) tile.classList.remove("enhanced");
+}
+
+/* =========================================
    VIDEO TILE
 ========================================= */
 
@@ -1223,6 +1351,7 @@ function setTileStream(id, stream) {
     const video = tile.querySelector("video");
 
     if (!stream) {
+        stopEnhancement(id);
         video.srcObject = null;
         tile.classList.remove("has-video");
         return;
@@ -1230,6 +1359,7 @@ function setTileStream(id, stream) {
 
     const hasLiveVideo = stream.getVideoTracks().some(t => t.readyState === "live");
     if (!hasLiveVideo) {
+        stopEnhancement(id);
         video.srcObject = null;
         tile.classList.remove("has-video");
         return;
@@ -1238,9 +1368,16 @@ function setTileStream(id, stream) {
     video.srcObject = stream;
     video.play().catch(() => {});
     tile.classList.add("has-video");
+
+    // فقط برای streamهای ریموت enhancement اعمال کن
+    const isLocal = (id === myId);
+    if (!isLocal) {
+        startEnhancement(tile, video, id);
+    }
 }
 
 function removeVideoTile(id) {
+    stopEnhancement(id);
     const tile = document.getElementById(`tile-${id}`);
     if (tile) tile.remove();
 }
@@ -1385,9 +1522,9 @@ async function ensureCameraStream() {
     cameraStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
-            width: { ideal: 320 },
-            height: { ideal: 240 },
-            frameRate: { ideal: 15, max: 30 },
+            width: { ideal: CAMERA_CAPTURE_PROFILE.width },
+            height: { ideal: CAMERA_CAPTURE_PROFILE.height },
+            frameRate: { ideal: CAMERA_CAPTURE_PROFILE.fps },
             facingMode: "user"
         }
     });
@@ -1413,7 +1550,7 @@ function releaseCameraIfUnused() {
 }
 
 /* =========================================
-   CAMERA (Sharing)
+   CAMERA (Sharing — very low bitrate)
 ========================================= */
 
 async function ensureShareStream() {
@@ -1425,9 +1562,9 @@ async function ensureShareStream() {
         shareStream = await navigator.mediaDevices.getUserMedia({
             audio: false,
             video: {
-                width: { ideal: 640 },
-                height: { ideal: 360 },
-                frameRate: { ideal: 24, max: 30 },
+                width: { ideal: VIDEO_SEND_PROFILE.width, max: VIDEO_SEND_PROFILE.width },
+                height: { ideal: VIDEO_SEND_PROFILE.height, max: VIDEO_SEND_PROFILE.height },
+                frameRate: { ideal: VIDEO_SEND_PROFILE.fps, max: VIDEO_SEND_PROFILE.fps },
                 facingMode: "user"
             }
         });
@@ -1448,6 +1585,40 @@ async function ensureShareStream() {
     }
 
     return shareStream;
+}
+
+// سقف سخت روی bitrate هر sender
+async function applyBitrateCap(call) {
+    const apply = async () => {
+        try {
+            const pc = call?.peerConnection;
+            if (!pc) return false;
+
+            const senders = pc.getSenders().filter(
+                s => s.track && s.track.kind === "video"
+            );
+
+            for (const sender of senders) {
+                const params = sender.getParameters();
+                if (!params.encodings || !params.encodings.length) {
+                    params.encodings = [{}];
+                }
+                params.encodings[0].maxBitrate = VIDEO_SEND_PROFILE.maxBitrate;
+                params.encodings[0].maxFramerate = VIDEO_SEND_PROFILE.fps;
+                params.degradationPreference = "bandwidth";
+                await sender.setParameters(params);
+            }
+            return senders.length > 0;
+        } catch (e) {
+            console.warn("Could not apply bitrate cap:", e);
+            return false;
+        }
+    };
+
+    // PeerJS ممکن است senderها را دیرتر بسازد
+    setTimeout(apply, 250);
+    setTimeout(apply, 1000);
+    setTimeout(apply, 2500);
 }
 
 function updateCameraButton() {
@@ -1475,7 +1646,7 @@ async function startCameraSharing() {
             if (member.peerId) callPeer(member.peerId);
         }
 
-        setStatus("Your camera is now being shared.");
+        setStatus("Camera sharing started (low-data mode: 160×90, 1 fps, ~8 kbps).");
     } catch (error) {
         console.error(error);
         isCamOn = false;
@@ -1495,15 +1666,12 @@ function stopCameraSharing() {
     updateCameraButton();
     updateMyCameraStatus();
     releaseCameraIfUnused();
-    setStatus("Camera sharing stopped. Your study session can continue.");
+    setStatus("Camera sharing stopped.");
 }
 
 toggleBtn.addEventListener("click", async () => {
-    if (!isCamOn) {
-        await startCameraSharing();
-    } else {
-        stopCameraSharing();
-    }
+    if (!isCamOn) await startCameraSharing();
+    else stopCameraSharing();
 });
 
 /* =========================================
@@ -1512,16 +1680,14 @@ toggleBtn.addEventListener("click", async () => {
 
 function callPeer(remotePeerId) {
     if (!peer || !shareStream || !remotePeerId || remotePeerId === myId) return;
-    if (peer.destroyed || peer.disconnected || peer.open === false) {
-        console.warn("Peer not ready — skipping call to", remotePeerId);
-        return;
-    }
+    if (peer.destroyed || peer.disconnected || peer.open === false) return;
     if (outgoingCalls.has(remotePeerId)) return;
 
     try {
         const call = peer.call(remotePeerId, shareStream);
         if (!call) return;
         outgoingCalls.set(remotePeerId, call);
+        applyBitrateCap(call);
 
         call.on("stream", (remoteStream) => {
             setTileStream(remotePeerId, remoteStream);
@@ -1531,12 +1697,7 @@ function callPeer(remotePeerId) {
             if (outgoingCalls.get(remotePeerId) === call) {
                 outgoingCalls.delete(remotePeerId);
             }
-            const tile = document.getElementById(`tile-${remotePeerId}`);
-            if (tile) {
-                tile.classList.remove("has-video");
-                const v = tile.querySelector("video");
-                if (v) v.srcObject = null;
-            }
+            setTileStream(remotePeerId, null);
         });
 
         call.on("error", (error) => {
@@ -1553,6 +1714,7 @@ function handleIncomingCall(call) {
     try {
         call.answer(shareStream || undefined);
         incomingCalls.set(remotePeerId, call);
+        applyBitrateCap(call);
 
         call.on("stream", (stream) => setTileStream(remotePeerId, stream));
 
@@ -1560,12 +1722,7 @@ function handleIncomingCall(call) {
             if (incomingCalls.get(remotePeerId) === call) {
                 incomingCalls.delete(remotePeerId);
             }
-            const tile = document.getElementById(`tile-${remotePeerId}`);
-            if (tile) {
-                tile.classList.remove("has-video");
-                const v = tile.querySelector("video");
-                if (v) v.srcObject = null;
-            }
+            setTileStream(remotePeerId, null);
         });
 
         call.on("error", (error) => {
@@ -1587,18 +1744,18 @@ function removePeer(peerId) {
 }
 
 /* =========================================
-   SOCKET.IO
+   SOCKET.IO (WebSocket first)
 ========================================= */
 
 function setupSocket() {
     socket = io({
-        transports: ["polling", "websocket"],
+        transports: ["websocket", "polling"],  // websocket اول
         upgrade: true,
         rememberUpgrade: true,
         reconnection: true,
         reconnectionAttempts: Infinity,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
+        reconnectionDelay: 2000,
+        reconnectionDelayMax: 10000,
         timeout: 20000
     });
 
@@ -1710,7 +1867,7 @@ function setupSocket() {
 }
 
 /* =========================================
-   MEDIAPIPE FACELANDMARKER
+   MEDIAPIPE
 ========================================= */
 
 async function initializeFaceLandmarker() {
@@ -1718,7 +1875,6 @@ async function initializeFaceLandmarker() {
 
     try {
         const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_PATH);
-
         faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
             baseOptions: {
                 modelAssetPath: FACE_LANDMARKER_MODEL_PATH,
@@ -1731,7 +1887,6 @@ async function initializeFaceLandmarker() {
             minFacePresenceConfidence: 0.5,
             minTrackingConfidence: 0.5
         });
-
         console.log("FaceLandmarker (local) ready.");
         return faceLandmarker;
     } catch (error) {
@@ -1746,10 +1901,7 @@ async function initializeFaceLandmarker() {
 
 function analyzeFaceResult(result) {
     const landmarks = result?.faceLandmarks?.[0];
-
-    if (!landmarks) {
-        return { state: "away", confidence: 0 };
-    }
+    if (!landmarks) return { state: "away", confidence: 0 };
 
     const leftEyeOuter = landmarks[33];
     const leftEyeInner = landmarks[133];
@@ -1766,20 +1918,12 @@ function analyzeFaceResult(result) {
     const eyeCenterX = (leftEyeCenterX + rightEyeCenterX) / 2;
     const eyeDistance = Math.abs(rightEyeCenterX - leftEyeCenterX);
 
-    if (eyeDistance < 0.01) {
-        return { state: "distracted", confidence: 0.3 };
-    }
+    if (eyeDistance < 0.01) return { state: "distracted", confidence: 0.3 };
 
-    const headOffset = Math.abs(nose.x - eyeCenterX);
-    const normalizedOffset = headOffset / eyeDistance;
-
+    const normalizedOffset = Math.abs(nose.x - eyeCenterX) / eyeDistance;
     if (normalizedOffset > 0.75) {
-        return {
-            state: "distracted",
-            confidence: Math.min(1, normalizedOffset / 1.5)
-        };
+        return { state: "distracted", confidence: Math.min(1, normalizedOffset / 1.5) };
     }
-
     return { state: "focused", confidence: 0.9 };
 }
 
@@ -1887,7 +2031,6 @@ function detectionTick() {
     }
 
     const video = presenceVideo;
-
     if (!video || video.readyState < 2) {
         presenceText.textContent = "Waiting for camera frames...";
         setTimeout(detectionTick, DETECT_INTERVAL_MS);
@@ -1899,8 +2042,7 @@ function detectionTick() {
             console.warn("Video not producing new frames:", {
                 currentTime: video.currentTime,
                 readyState: video.readyState,
-                paused: video.paused,
-                ended: video.ended
+                paused: video.paused
             });
         }
         setTimeout(detectionTick, 100);
@@ -1931,12 +2073,8 @@ function detectionTick() {
         }
 
         if (faceCount === 0) {
-            if (!faceLostSince) {
-                faceLostSince = performance.now();
-                console.log("Face lost — starting grace period");
-            }
-            const lostDuration = performance.now() - faceLostSince;
-            if (lostDuration >= FACE_LOST_GRACE_MS) {
+            if (!faceLostSince) faceLostSince = performance.now();
+            if (performance.now() - faceLostSince >= FACE_LOST_GRACE_MS) {
                 updateStableStudyState("away");
                 latestConfidence = 0;
             }
@@ -1968,9 +2106,7 @@ async function startPresenceDetection() {
     await ensureCameraStream();
 
     try {
-        if (presenceVideo.paused) {
-            await presenceVideo.play();
-        }
+        if (presenceVideo.paused) await presenceVideo.play();
     } catch (e) {
         console.warn("presenceVideo.play() failed:", e);
     }
@@ -2274,7 +2410,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 /* =========================================
-   PERIODIC SYNC
+   PERIODIC SYNC (60s)
 ========================================= */
 
 setInterval(() => {
@@ -2285,7 +2421,7 @@ setInterval(() => {
 
 setInterval(() => {
     if (isStudying) saveOwnStats();
-}, 30000);
+}, 60000);
 
 /* =========================================
    CLEANUP
@@ -2294,6 +2430,7 @@ setInterval(() => {
 window.addEventListener("beforeunload", () => {
     saveOwnStats();
     stopStudyClock();
+    enhancementMap.forEach((_, id) => stopEnhancement(id));
     if (isStudying && socket?.connected) {
         socket.emit("study-status", { studying: false });
     }
