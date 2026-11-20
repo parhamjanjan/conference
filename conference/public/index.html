@@ -589,7 +589,7 @@
             max-height: calc(100vh - 125px);
             overflow: auto;
             padding: 16px;
-            border-radius: 19px
+            border-radius: 19px;
         }
 
         .panel-header {
@@ -1322,6 +1322,7 @@
 
             .members-panel {
                 position: fixed !important;
+                display: none;
                 z-index: 1300;
                 top: 0;
                 right: 0;
@@ -1468,6 +1469,77 @@
                 transition-duration: .01ms !important
             }
         }
+
+        .leaderboard-notice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto 22px;
+    padding: 12px 18px;
+
+    background: linear-gradient(
+        135deg,
+        rgba(99, 102, 241, 0.10),
+        rgba(59, 130, 246, 0.06)
+    );
+
+    border: 1px solid rgba(129, 140, 248, 0.22);
+    border-radius: 14px;
+
+    color: #c7d2fe;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.7;
+
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    box-shadow:
+        0 4px 20px rgba(0, 0, 0, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+    transition: all 0.25s ease;
+}
+
+.leaderboard-notice:hover {
+    border-color: rgba(129, 140, 248, 0.4);
+    background: linear-gradient(
+        135deg,
+        rgba(99, 102, 241, 0.15),
+        rgba(59, 130, 246, 0.09)
+    );
+    transform: translateY(-2px);
+}
+
+.leaderboard-notice .notice-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    width: 25px;
+    height: 25px;
+
+    border-radius: 50%;
+    background: rgba(129, 140, 248, 0.15);
+    border: 1px solid rgba(129, 140, 248, 0.25);
+
+    color: #a5b4fc;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+@media (max-width: 600px) {
+    .leaderboard-notice {
+        width: 100%;
+        padding: 11px 13px;
+        font-size: 12px;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+}
     </style>
 </head>
 
@@ -1569,6 +1641,10 @@
                         <button class="period-tab" data-period="all">All Time</button>
                     </div>
                 </div>
+                <div class="leaderboard-notice" role="note">
+    <span class="notice-icon">ℹ</span>
+    <span>Only the top 5 participants are displayed in the leaderboard.</span>
+</div>
                 <div class="podium" id="podium"></div>
                 <div class="leaderboard-list" id="leaderboardList">
                     <div class="empty-leaderboard">Study statistics will appear here.</div>
@@ -1624,7 +1700,7 @@
            CONFIG
         ========================================= */
         const VIDEO_SEND_PROFILE = { width: 352, height: 288, fps: 8, maxBitrate: 100000 };
-        const SCREEN_SEND_PROFILE = { fps: 8, maxBitrate: 200000 };
+        const SCREEN_SEND_PROFILE = { fps: 8, maxBitrate: 100000 };
         const PROFILE_SYNC_INTERVAL = 60000;
         const CLOCK_TICK_MS = 1000;
         const MAX_TICK_GAP_MS = 5000;
@@ -2113,7 +2189,7 @@
                 podium.appendChild(card);
             });
 
-            ranked.slice(3).forEach((person, index) => {
+            ranked.slice(3 , 5).forEach((person, index) => {
                 const row = document.createElement("div");
                 row.className = "leaderboard-item";
                 const rank = document.createElement("div");
@@ -2160,10 +2236,12 @@
             $("membersPanel")?.classList.remove("drawer-open");
             $("membersBackdrop")?.classList.remove("visible");
             $("membersToggle")?.setAttribute("aria-expanded", "false");
+            $("membersPanel").style.display = "none"
         }
         $("membersToggle")?.addEventListener("click", () => {
             const panel = $("membersPanel");
             const opening = !panel.classList.contains("drawer-open");
+            if (opening){panel.style.display = "block"}
             panel.classList.toggle("drawer-open", opening);
             $("membersBackdrop").classList.toggle("visible", opening);
             $("membersToggle").setAttribute("aria-expanded", String(opening));
