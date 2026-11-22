@@ -1003,6 +1003,109 @@
                 transition-duration: .01ms !important
             }
         }
+
+        .ic {
+            width: 14px;
+            height: 14px;
+            vertical-align: -2px;
+            margin-inline-start: 4px;
+            flex-shrink: 0;
+        }
+
+        .ic-cam {
+            color: #4ade80;
+        }
+
+        .ic-screen {
+            color: #60a5fa;
+        }
+
+        .ic-study {
+            color: #fbbf24;
+        }
+
+        #playerList {
+            max-height: 450px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 4px;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(233, 191, 124, .45) transparent;
+        }
+
+        #playerList::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #playerList::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #playerList::-webkit-scrollbar-thumb {
+            background: rgba(233, 191, 124, .45);
+            border-radius: 6px;
+        }
+
+        #playerList::-webkit-scrollbar-thumb:hover {
+            background: rgba(233, 191, 124, .7);
+        }
+
+        /* ===== Champion badges ===== */
+        .pname {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0
+        }
+
+        .pname b {
+            flex: 0 1 auto;
+            min-width: 0
+        }
+
+        .wins {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            flex-shrink: 0;
+            padding: 2px 8px 2px 6px;
+            border-radius: 20px;
+            font-size: 10px;
+            font-weight: 800;
+            white-space: nowrap;
+            color: #2a1906;
+            background: linear-gradient(115deg, #f9e0a6, #e0a43f);
+            box-shadow: 0 2px 10px rgba(233, 191, 124, .35), inset 0 1px 0 rgba(255, 255, 255, .55);
+            animation: winGlow 2.6s ease-in-out infinite;
+        }
+
+        @keyframes winGlow {
+            50% {
+                box-shadow: 0 0 16px rgba(233, 191, 124, .85), inset 0 1px 0 rgba(255, 255, 255, .55)
+            }
+        }
+
+        .token .wbt {
+            font: 800 10px Inter;
+            fill: #3a2406
+        }
+
+        /* Confetti */
+        .confetti {
+            position: fixed;
+            top: -30px;
+            z-index: 100;
+            font-size: 22px;
+            pointer-events: none;
+            animation: fall linear forwards
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(110vh) rotate(720deg)
+            }
+        }
     </style>
 </head>
 
@@ -1194,7 +1297,10 @@
             if (!p?.userId || p.userId === userId || typeof p.data !== "object") return;
             const ex = remoteProfiles.get(p.userId);
             const days = mergeDays(ex?.data?.days, p.data.days), rolls = mergeRolls(ex?.data?.rolls, p.data.rolls);
-            if (ex && rolls.length > (ex.data?.rolls || []).length) setTicker(moveText(p.name || ex.name || "Participant", computeState(rolls).last));
+            if (ex && rolls.length > (ex.data?.rolls || []).length) {
+                setTicker(moveText(p.name || ex.name || "Participant", computeState(rolls).last));
+                if (computeState(rolls).wins > computeState(ex.data?.rolls || []).wins) celebrate();
+            }
             remoteProfiles.set(p.userId, { name: p.name || ex?.name || "Participant", data: { version: 1, days, rolls } });
             saveRemoteProfiles(); renderLeaderboard();
         }
@@ -1813,11 +1919,33 @@
         $("studyBtn").addEventListener("click", () => isStudying ? stopStudy() : startStudy());
 
         /* ================= HUD TICK ================= */
+
+        const ICONS = {
+            cam: `<svg class="ic ic-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="camera"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>`,
+            screen: `<svg class="ic ic-screen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="screen share"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+            study: `<svg class="ic ic-study" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="studying"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`
+        };
+
+
         setInterval(() => {
             if (!joined) return;
-            const rows = [`<b>${esc(userName)} (you)</b> ${isCamOn ? "📷" : ""}${isScreenSharing ? "🖥" : ""}${isStudying && facePresent ? "📚" : ""}`];
-            remoteMembers.forEach(m => rows.push(`${esc(m.name || "Participant")} ${remoteCam.has(m.peerId) ? "📷" : ""}${remoteScr.has(m.peerId) ? "🖥" : ""}${m.studying ? "📚" : ""}`));
-            $("people").innerHTML = `<b style="color:#b5b6c7">PARTICIPANTS (${rows.length})</b><br>` + rows.join("<br>");
+
+            const rows = [
+                `<b>${esc(userName)} (you)</b>` +
+                (isCamOn ? ICONS.cam : "") +
+                (isScreenSharing ? ICONS.screen : "") +
+                (isStudying && facePresent ? ICONS.study : "")
+            ];
+
+            remoteMembers.forEach(m => rows.push(
+                `${esc(m.name || "Participant")}` +
+                (remoteCam.has(m.peerId) ? ICONS.cam : "") +
+                (remoteScr.has(m.peerId) ? ICONS.screen : "") +
+                (m.studying ? ICONS.study : "")
+            ));
+
+            $("people").innerHTML =
+                `<b style="color:#b5b6c7">PARTICIPANTS (${rows.length})</b><br>` + rows.join("<br>");
             renderLeaderboard();
         }, 1000);
         function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -1836,26 +1964,43 @@
             const a = new Uint8Array(1); do { crypto.getRandomValues(a); } while (a[0] >= 252);
             const v = a[0] % 9; return v < 3 ? v + 1 : 4 + Math.floor((v - 3) / 2);
         }
+        /* Reaching exactly 100 = a win: wins++ and the token returns to square 0 */
         function computeState(rolls) {
-            let pos = 0, last = null;
+            let pos = 0, last = null, wins = 0;
             for (const r of rolls) {
                 const from = pos, land = pos + r;
                 if (land > 100) { last = { r, from, land: from, to: from, type: "bounce" }; continue; }
-                let to = land, type = null; if (JUMPS[land]) { to = JUMPS[land]; type = to > land ? "ladder" : "snake"; }
-                pos = to; last = { r, from, land, to, type }; if (pos === 100) break;
+                let to = land, type = null;
+                if (JUMPS[land]) { to = JUMPS[land]; type = to > land ? "ladder" : "snake"; }
+                last = { r, from, land, to, type };
+                if (to === 100) { wins++; last.won = true; pos = 0; }
+                else pos = to;
             }
-            return { pos, last };
+            return { pos, last, wins };
         }
         function cellXY(n) { const i = n - 1, row = Math.floor(i / 10), c = i % 10, col = row % 2 ? 9 - c : c; return [col * 60 + 30, (9 - row) * 60 + 30]; }
         function moveText(name, l) {
             if (!l) return ""; const b = `🎲 ${name} rolled a ${l.r}`;
             if (l.type === "bounce") return `${b} — too high, stays on ${l.from || "the start"}`;
             if (l.type === "snake") return `${b} 🐍 bitten on ${l.land}, slides down to ${l.to}`;
-            if (l.to === 100) return `${b} 🏆 reaches square 100 and wins!`;
+            if (l.to === 100) return `${b} 🏆 reaches square 100 and becomes a champion! Back to the start for another run 🔄`;
             if (l.type === "ladder") return `${b} 🪜 climbs from ${l.land} up to ${l.to}`;
             return `${b} → square ${l.to}`;
         }
         const setTicker = t => { if (t) $("gameTicker").textContent = t; };
+        function celebrate() {
+            const E = ["🎉", "✨", "🏆", "⭐", "🎊", "👑"];
+            for (let i = 0; i < 40; i++) {
+                const s = document.createElement("span");
+                s.className = "confetti";
+                s.textContent = E[Math.floor(Math.random() * E.length)];
+                s.style.left = Math.random() * 100 + "vw";
+                s.style.animationDuration = (2.5 + Math.random() * 2.5) + "s";
+                s.style.animationDelay = (Math.random() * .8) + "s";
+                document.body.appendChild(s);
+                setTimeout(() => s.remove(), 6500);
+            }
+        }
         function buildBoard() {
             let s = `<defs>
   <linearGradient id="gA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2b2f5c"/><stop offset="1" stop-color="#1e2146"/></linearGradient>
@@ -1897,16 +2042,16 @@
         }
         function makeToken(p) {
             const g = document.createElementNS("http://www.w3.org/2000/svg", "g"); g.setAttribute("class", "token");
-            g.innerHTML = `<circle class="ring" r="18"/><circle r="14" fill="hsl(${hueOf(p.id)} 68% 52%)" stroke="#fff" stroke-width="2.5"/><circle cx="-4" cy="-5" r="4.5" fill="rgba(255,255,255,.35)"/><text text-anchor="middle" dy=".35em"></text>`;
-            g.querySelector("text").textContent = (p.name || "?").trim().charAt(0).toUpperCase(); return g;
+            g.innerHTML = `<circle class="ring" r="18"/><circle r="14" fill="hsl(${hueOf(p.id)} 68% 52%)" stroke="#fff" stroke-width="2.5"/><circle cx="-4" cy="-5" r="4.5" fill="rgba(255,255,255,.35)"/><text class="tl" text-anchor="middle" dy=".35em"></text><g class="wb" style="display:none"><circle cx="12" cy="-12" r="8" fill="#fbbf24" stroke="#fff" stroke-width="1.5"/><text class="wbt" x="12" y="-12" text-anchor="middle" dy=".35em"></text></g>`;
+            g.querySelector(".tl").textContent = (p.name || "?").trim().charAt(0).toUpperCase(); return g;
         }
         function getPlayers() {
             const list = [];
             remoteProfiles.forEach((profile, id) => { const m = remoteMembers.get(id); list.push({ id, name: m?.name || profile.name || "Participant", days: profile.data?.days || {}, rolls: profile.data?.rolls || [], me: false }); });
             list.push({ id: userId, name: userName, days: ownStats.days, rolls: ownStats.rolls, me: true });
-            return list.map(p => {
+            return list.filter(p => p.me || p.rolls.length > 0).map(p => {
                 const st = computeState(p.rolls), secs = totalSecs(p.days);
-                return { ...p, secs, last: st.last, pos: overridePos.has(p.id) ? overridePos.get(p.id) : st.pos, available: Math.max(0, Math.floor(secs / DICE_EVERY) - p.rolls.length) };
+                return { ...p, secs, wins: st.wins, last: st.last, pos: overridePos.has(p.id) ? overridePos.get(p.id) : st.pos, available: Math.max(0, Math.floor(secs / DICE_EVERY) - p.rolls.length) };
             });
         }
         function setDie(n) {
@@ -1919,29 +2064,32 @@
             $("diceBadge").textContent = available > 0 ? `🎲 ${available}` : "";
             if (view !== "game") return;
             if (!boardBuilt) buildBoard();
-            const myPos = computeState(ownStats.rolls).pos, toNext = DICE_EVERY - (secs % DICE_EVERY);
+            const myWins = computeState(ownStats.rolls).wins, toNext = DICE_EVERY - (secs % DICE_EVERY);
             $("diceCount").textContent = available; $("diceBar").style.width = ((secs % DICE_EVERY) / DICE_EVERY * 100).toFixed(1) + "%";
-            $("diceNext").textContent = myPos >= 100 ? "You have conquered the board! 🏆" : `${Math.floor(toNext / 60)}m ${String(toNext % 60).padStart(2, "0")}s until your next dice${isStudying ? "" : " — start studying!"}`;
-            const btn = $("rollBtn"); btn.disabled = rolling || available < 1 || myPos >= 100;
-            if (!rolling) { btn.textContent = myPos >= 100 ? "🏆 You reached 100!" : available > 0 ? `Roll the dice (${available})` : "No dice yet"; setDie(ownStats.rolls.length ? ownStats.rolls[ownStats.rolls.length - 1] : 1); }
+            $("diceNext").textContent = `${Math.floor(toNext / 60)}m ${String(toNext % 60).padStart(2, "0")}s until your next dice${isStudying ? "" : " — start studying!"}${myWins ? "  ·  🏆 " + myWins + (myWins === 1 ? " win" : " wins") : ""}`;
+            const btn = $("rollBtn"); btn.disabled = rolling || available < 1;
+            if (!rolling) { btn.textContent = available > 0 ? `Roll the dice (${available})` : "No dice yet"; setDie(ownStats.rolls.length ? ownStats.rolls[ownStats.rolls.length - 1] : 1); }
             const players = getPlayers(), layer = $("tokenLayer"), groups = new Map(), seen = new Set();
             players.forEach(p => { const a = groups.get(p.pos) || []; a.push(p); groups.set(p.pos, a); });
             groups.forEach((arr, pos) => arr.forEach((p, slot) => {
                 seen.add(p.id); let g = tokenEls.get(p.id); if (!g) { g = makeToken(p); tokenEls.set(p.id, g); layer.appendChild(g); }
-                g.classList.toggle("me", p.me); const t = tokenSpot(pos, slot, arr.length); g.style.transform = `translate(${t.x}px,${t.y}px) scale(${t.s})`;
+                g.classList.toggle("me", p.me);
+                g.querySelector(".wb").style.display = p.wins ? "" : "none";
+                g.querySelector(".wbt").textContent = p.wins;
+                const t = tokenSpot(pos, slot, arr.length); g.style.transform = `translate(${t.x}px,${t.y}px) scale(${t.s})`;
             }));
             tokenEls.forEach((g, id) => { if (!seen.has(id)) { g.remove(); tokenEls.delete(id); } });
-            const sorted = [...players].sort((a, b) => b.pos - a.pos || b.secs - a.secs);
+            const sorted = [...players].sort((a, b) => b.wins - a.wins || b.pos - a.pos || b.secs - a.secs);
             $("playerCount").textContent = sorted.length;
             $("playerList").innerHTML = sorted.map((p, i) => {
                 const mark = p.last?.type === "snake" ? " 🐍" : p.last?.type === "ladder" ? " 🪜" : "";
-                return `<div class="prow${p.me ? " me" : ""}"><span style="width:14px;font-size:11px;color:#8e90ad">${i + 1}</span><span class="pav" style="background:hsl(${hueOf(p.id)} 62% 48%)">${esc((p.name || "?").trim().charAt(0).toUpperCase())}</span><div class="pinfo"><b>${esc(p.name)}${p.me ? " (you)" : ""}</b><small>${p.pos ? "Square " + p.pos : "At the start"}${mark}${p.available ? " · 🎲 " + p.available : ""}</small><div class="pbar"><i style="width:${Math.min(100, p.pos)}%"></i></div></div><span class="ppos">${p.pos >= 100 ? "👑" : p.pos || "—"}</span></div>`;
+                return `<div class="prow${p.me ? " me" : ""}"><span style="width:14px;font-size:11px;color:#8e90ad">${i + 1}</span><span class="pav" style="background:hsl(${hueOf(p.id)} 62% 48%)">${esc((p.name || "?").trim().charAt(0).toUpperCase())}</span><div class="pinfo"><div class="pname"><b>${esc(p.name)}${p.me ? " (you)" : ""}</b>${p.wins ? `<span class="wins" title="${p.wins} wins">🏆 ×${p.wins}</span>` : ""}</div><small>${p.pos ? "Square " + p.pos : "At the start"}${mark}${p.available ? " · 🎲 " + p.available : ""}</small><div class="pbar"><i style="width:${Math.min(100, p.pos)}%"></i></div></div><span class="ppos">${p.pos || "—"}</span></div>`;
             }).join("");
         }
         async function rollMyDice() {
             if (rolling) return;
-            const secs = totalSecs(ownStats.days), before = computeState(ownStats.rolls).pos;
-            if (Math.floor(secs / DICE_EVERY) - ownStats.rolls.length < 1 || before >= 100) return;
+            const secs = totalSecs(ownStats.days);
+            if (Math.floor(secs / DICE_EVERY) - ownStats.rolls.length < 1) return;
             rolling = true; const btn = $("rollBtn"), die = $("die"); btn.disabled = true; btn.textContent = "Rolling…";
             const r = rollDie(); die.classList.add("rolling");
             const flick = setInterval(() => setDie(1 + Math.floor(Math.random() * 6)), 90);
@@ -1952,6 +2100,7 @@
                 for (let p = last.from + 1; p <= last.land; p++) { overridePos.set(userId, p); renderLeaderboard(); await sleep(240); }
                 if (last.type === "snake" || last.type === "ladder") { await sleep(450); overridePos.set(userId, last.to); renderLeaderboard(); await sleep(800); }
             }
+            if (last.won) { celebrate(); await sleep(2200); }
             overridePos.delete(userId); rolling = false; renderLeaderboard();
         }
         $("rollBtn").addEventListener("click", rollMyDice);
