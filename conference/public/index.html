@@ -2086,10 +2086,36 @@
         /* ---- local player / controls ---- */
         let py = 0, level = 0, px = 0, pz = 11, yaw = 0, pitch = 0, mySeat = -1, tyaw = 0, tpitch = .35, tdist = 3.6;
         const keys = new Set(), touchDirs = new Set();
+        // A staircase may only be entered by crossing its lower doorway from the
+        // lower-floor approach side. Merely touching the rear/outer edge of the
+        // spiral is not a valid entrance.
+        function canEnterStair(fromX, fromZ, toX, toZ) {
+            const fromStair = stairInfo(fromX, fromZ);
+            const toStair = stairInfo(toX, toZ);
+            if (fromStair || !toStair) return true;
+
+            // The lower entrance is the theta=0 edge (z = ST.cz). The player
+            // must cross that edge in the forward direction, through the matching
+            // gate opening, and only after the gate has physically opened.
+            const crossedEntrance = fromZ >= ST.cz - .12 && toZ < ST.cz + .04;
+            if (!crossedEntrance) return false;
+
+            // stairInfo's m sign is opposite to the matching doorway's x sign.
+            const doorway = stairDoors.find(d =>
+                Math.abs(d.x + toStair.m * (ST.cx - ST.R)) < .25 &&
+                Math.abs(toX - d.x) < 1.12 &&
+                Math.abs(toZ - d.z) < .7
+            );
+            if (!doorway) return false;
+
+            const hasThreeWins = computeState(ownStats.rolls).wins >= 3;
+            return hasThreeWins && doorway.open;
+        }
+
         const blocked = (x, z) => {
             if (level === 2) { if (x < -26.6 || x > -13.4 || z < -6.6 || z > 6.6) return true; } else if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > BOUNDS.z1) return true;
             const si = stairInfo(x, z);
-            // Opaque gates seal the lower mouths of both staircases; no side-slipping around them.
+            // Keep the physical doorway sealed until the three-win requirement is met.
             const hasThreeWins = computeState(ownStats.rolls).wins >= 3;
             if (stairDoors.some(d => Math.abs(x - d.x) < 1.52 && Math.abs(z - d.z) < .48 && (!hasThreeWins || !d.open))) return true;
             if (si && (Math.abs(si.r - ST.R - ST.hw) < .22 || Math.abs(si.r - ST.R + ST.hw) < .22 || (level === 1 && si.th < .12))) return true;
@@ -2157,8 +2183,11 @@
             const sp = (keys.has("ShiftLeft") ? 5.5 : 3.2) * dt;
             let dx = -Math.sin(yaw) * f + Math.cos(yaw) * r, dz = -Math.cos(yaw) * f - Math.sin(yaw) * r;
             const l = Math.hypot(dx, dz) || 1; dx = dx / l * sp; dz = dz / l * sp;
-            if (!blocked(px + dx, pz)) px += dx;
-            if (!blocked(px, pz + dz)) pz += dz;
+            const nextX = px + dx;
+            if (!blocked(nextX, pz) && canEnterStair(px, pz, nextX, pz)) px = nextX;
+
+            const nextZ = pz + dz;
+            if (!blocked(px, nextZ) && canEnterStair(px, pz, px, nextZ)) pz = nextZ;
         }
         function placeCamera() {
             if (mySeat < 0) { camera.position.set(px, py + 1.65, pz); camera.rotation.set(pitch, yaw, 0); return; }
