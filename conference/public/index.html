@@ -1738,7 +1738,30 @@
             if (!gl) { gl = []; scene.traverse(o => { if (o.isPointLight && !o.userData.up) { o.userData.i0 = o.intensity; gl.push(o); } }); }
             gl.forEach(l => l.intensity = l.userData.i0 * (1 - .92 * upK)); moon.intensity = .6 * (1 - .85 * upK);
             const t = now / 1000, off = performance.now() < offUntil, fl = off ? 0 : (Math.sin(t * 23) * Math.sin(t * 7.3) > .55 ? .15 : 1);
-            fire.forEach((f, i) => f.scale.set(1 + Math.sin(t * 9 + i) * .15, .8 + Math.sin(t * 13 + i * 2) * .35, 1)); fireL.intensity = fireL.userData.i0 * (1 - .92 * upK) * (.8 + .2 * Math.sin(t * 11) * Math.sin(t * 7));
+            fire.forEach((f, i) => {
+                f.scale.set(1 + Math.sin(t * (7.5 + i * .17) + i) * .18,
+                    .82 + Math.sin(t * (10.5 + i * .13) + i * 2) * .24, 1);
+                f.rotation.z = Math.sin(t * 4.2 + i * 1.7) * .075 + (i - 4) * .035;
+                f.position.x = (i - 4) * .19 + Math.sin(t * 3.1 + i) * .035;
+                f.material.opacity = (.62 + .28 * Math.sin(t * 8 + i * 2)) * (1 - .92 * upK);
+            });
+            const ep = emberGeo.attributes.position;
+            for (let i = 0; i < emberCount; i++) {
+                let y = ep.getY(i) + emberVel[i] * .018;
+                let x = ep.getX(i) + Math.sin(t * 2.2 + i) * .002;
+                if (y > 2.05 || Math.random() < .002) { y = .32 + Math.random() * .35; x = (Math.random() - .5) * 1.35; }
+                ep.setXYZ(i, x, y, -7.0 + Math.sin(t + i) * .025);
+            }
+            ep.needsUpdate = true; embers.material.opacity = .9 * (1 - .92 * upK);
+            smoke.forEach((s, i) => {
+                s.mesh.position.y = 1.08 + ((t * s.speed + s.phase) % 1.35);
+                s.mesh.position.x = Math.sin(t * .55 + s.phase) * (.12 + i * .025);
+                s.mesh.scale.setScalar(.7 + ((t * s.speed + s.phase) % 1.35) * .65);
+                s.mesh.material.opacity = .07 * (1 - .92 * upK);
+            });
+            fireGlow.material.opacity = (.11 + .055 * Math.sin(t * 10) * Math.sin(t * 6)) * (1 - .92 * upK);
+            fireGlow.scale.set(1 + Math.sin(t * 5) * .07, 1 + Math.sin(t * 8) * .08, 1);
+            fireL.intensity = fireL.userData.i0 * (1 - .92 * upK) * (.78 + .22 * Math.sin(t * 11) * Math.sin(t * 7));
             if (now - champT > 250) { champT = now; isChamp = computeState(ownStats.rolls).wins >= 3; }
             { const ek = .45 * (1 - .9 * upK); if (Math.abs(ek - lastEk) > .005) { lastEk = ek; envMats.forEach(m => m.envMapIntensity = ek); } }
             ul.forEach((l, i) => l.intensity = l.userData.i0 * upK * (i === 2 ? fl : (off ? 0 : 1 + Math.sin(t * 9 + i) * .12)));
@@ -1830,31 +1853,246 @@
             });
         }
 
-        /* bookshelves (instanced books) */
-        const bookMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: .7 }), 5200);
-        let bookN = 0; scene.add(bookMesh);
-        const BCOL = [0x8b2e2e, 0x2e5a8b, 0x2e7a4a, 0xc9a23a, 0x5a3a7a, 0x7a4a2e, 0xb85c38, 0x2f6f6f, 0xd9cdb4, 0x3a3a52, 0x9a3b6a];
+        /* bookshelves: every single book gets a complete, readable English title */
+        const bookMesh = new THREE.InstancedMesh(
+            new THREE.BoxGeometry(1, 1, 1),
+            new THREE.MeshStandardMaterial({ roughness: .7 }),
+            5200
+        );
+        let bookN = 0;
+        scene.add(bookMesh);
+
+        const BCOL = [
+            0x8b2e2e, 0x2e5a8b, 0x2e7a4a, 0xc9a23a, 0x5a3a7a,
+            0x7a4a2e, 0xb85c38, 0x2f6f6f, 0xd9cdb4, 0x3a3a52,
+            0x9a3b6a, 0x315b58, 0x8a6b35, 0x57465f
+        ];
+
+        /* A large title library: titles repeat only after the full list is used. */
+        const BOOK_TITLES = [
+            "THE GREAT GATSBY", "ATOMIC HABITS", "THE HOBBIT", "THE ART OF WAR",
+            "PRIDE AND PREJUDICE", "MOBY DICK", "DUNE", "THE ALCHEMIST",
+            "THE ADVENTURES OF SHERLOCK HOLMES", "THE ODYSSEY", "NINETEEN EIGHTY-FOUR",
+            "LITTLE WOMEN", "THE SECRET GARDEN", "DRACULA", "JANE EYRE",
+            "THE ILIAD", "THE CATCHER IN THE RYE", "TO KILL A MOCKINGBIRD",
+            "THE PICTURE OF DORIAN GRAY", "CRIME AND PUNISHMENT",
+            "THE BROTHERS KARAMAZOV", "WAR AND PEACE", "ANNA KARENINA",
+            "THE COUNT OF MONTE CRISTO", "LES MISERABLES", "THE THREE MUSKETEERS",
+            "A TALE OF TWO CITIES", "GREAT EXPECTATIONS", "OLIVER TWIST",
+            "WUTHERING HEIGHTS", "THE OLD MAN AND THE SEA", "FAHRENHEIT 451",
+            "BRAVE NEW WORLD", "THE LORD OF THE RINGS", "THE FELLOWSHIP OF THE RING",
+            "THE TWO TOWERS", "THE RETURN OF THE KING", "THE SILMARILLION",
+            "THE NAME OF THE WIND", "A WIZARD OF EARTHSEA", "THE LION THE WITCH AND THE WARDROBE",
+            "THE VOYAGE OF THE DAWN TREADER", "CHARLOTTE'S WEB", "BLACK BEAUTY",
+            "TREASURE ISLAND", "ROBINSON CRUSOE", "GULLIVER'S TRAVELS",
+            "THE CALL OF THE WILD", "WHITE FANG", "THE JUNGLE BOOK",
+            "ALICE'S ADVENTURES IN WONDERLAND", "THROUGH THE LOOKING-GLASS",
+            "PETER PAN", "THE WONDERFUL WIZARD OF OZ", "PINOCCHIO",
+            "THE LITTLE PRINCE", "THE WIND IN THE WILLOWS", "ANIMAL FARM",
+            "LORD OF THE FLIES", "THE GRAPES OF WRATH", "EAST OF EDEN",
+            "OF MICE AND MEN", "THE SOUND AND THE FURY", "BELOVED",
+            "THE COLOR PURPLE", "THE KITE RUNNER", "A THOUSAND SPLENDID SUNS",
+            "LIFE OF PI", "THE BOOK THIEF", "THE SHADOW OF THE WIND",
+            "THE NIGHT CIRCUS", "THE MIDNIGHT LIBRARY", "THE BOOK OF LOST THINGS",
+            "THE SILENT PATIENT", "GONE GIRL", "THE GIRL WITH THE DRAGON TATTOO",
+            "MURDER ON THE ORIENT EXPRESS", "AND THEN THERE WERE NONE",
+            "THE HOUND OF THE BASKERVILLES", "THE SIGN OF FOUR",
+            "THE COMPLETE POEMS", "SELECTED SHORT STORIES", "A BRIEF HISTORY OF TIME",
+            "COSMOS", "THE SELFISH GENE", "SAPIENS", "HOMO DEUS",
+            "THINKING FAST AND SLOW", "THE POWER OF HABIT", "DEEP WORK",
+            "THE 7 HABITS OF HIGHLY EFFECTIVE PEOPLE", "MAN'S SEARCH FOR MEANING",
+            "MEDITATIONS", "THE REPUBLIC", "THE PRINCE", "ON THE ORIGIN OF SPECIES",
+            "THE WEALTH OF NATIONS", "THE WORLD AS WILL AND REPRESENTATION",
+            "THE COMPLETE WORKS OF SHAKESPEARE", "HAMLET", "MACBETH",
+            "ROMEO AND JULIET", "A MIDSUMMER NIGHT'S DREAM", "THE DIVINE COMEDY",
+            "PARADISE LOST", "THE ODYSSEY: A NEW TRANSLATION", "THE METAMORPHOSIS",
+            "THE TRIAL", "THE STRANGER", "NOTES FROM UNDERGROUND",
+            "THE PLAGUE", "ONE HUNDRED YEARS OF SOLITUDE", "LOVE IN THE TIME OF CHOLERA",
+            "THE HOUSE OF THE SPIRITS", "MIDNIGHT'S CHILDREN", "THE GOD OF SMALL THINGS",
+            "THE REMAINS OF THE DAY", "NEVER LET ME GO", "Atonement",
+            "THE HANDMAID'S TALE", "THE TESTAMENTS", "THE ROAD",
+            "NO COUNTRY FOR OLD MEN", "BLOOD MERIDIAN", "THE MARTIAN",
+            "PROJECT HAIL MARY", "ENDer's GAME", "FOUNDATION",
+            "I, ROBOT", "DO ANDROIDS DREAM OF ELECTRIC SHEEP",
+            "THE LEFT HAND OF DARKNESS", "CHILDHOOD'S END", "NEUROMANCER",
+            "SNOW CRASH", "READY PLAYER ONE", "THE THREE-BODY PROBLEM",
+            "THE DARK FOREST", "DEATH'S END", "JURASSIC PARK",
+            "THE LOST WORLD", "THE TIME MACHINE", "THE WAR OF THE WORLDS",
+            "TWENTY THOUSAND LEAGUES UNDER THE SEA", "FROM THE EARTH TO THE MOON",
+            "THE INVISIBLE MAN", "STRANGE CASE OF DR JEKYLL AND MR HYDE",
+            "THE TURN OF THE SCREW", "FRANKENSTEIN", "THE HAUNTING OF HILL HOUSE",
+            "THE SHINING", "IT", "PET SEMATARY", "THE STAND",
+            "THE NAME OF THE ROSE", "THE TALENTED MR RIPLEY", "REBECCA",
+            "THE THIRTY-NINE STEPS", "THE BIG SLEEP", "THE MALTESE FALCON",
+            "THE MURDER OF ROGER ACKROYD", "THE MOONSTONE", "THE WOMAN IN WHITE",
+            "THE COMPLETE STORIES", "A ROOM WITH A VIEW", "HOWARDS END",
+            "MIDDLEmarch", "NORTH AND SOUTH", "THE AGE OF INNOCENCE",
+            "THE HOUSE OF MIRTH", "THE AWAKENING", "THE BELL JAR",
+            "THEIR EYES WERE WATCHING GOD", "THE SUN ALSO RISES",
+            "FOR WHOM THE BELL TOLLS", "A FAREWELL TO ARMS", "THE GREAT EXPECTATIONS",
+            "THE COMPLETE NOVELS", "THE ART OF READING", "THE HISTORY OF TOMORROW"
+        ];
+
+        /* Build one texture and one instanced label batch per title. This keeps
+           thousands of labels crisp without creating thousands of separate meshes. */
+        const titleIndexByName = new Map();
+        const titlePlacements = BOOK_TITLES.map(() => []);
+        const titleTextures = BOOK_TITLES.map((title, index) => {
+            const cv = document.createElement("canvas");
+            cv.width = 256;
+            cv.height = 1024;
+            const ctx = cv.getContext("2d");
+            ctx.clearRect(0, 0, cv.width, cv.height);
+
+            /* Gold spine ornaments and a subtle dark translucent backing. */
+            ctx.fillStyle = "rgba(18, 13, 10, 0.34)";
+            ctx.fillRect(14, 12, 228, 1000);
+            ctx.strokeStyle = "rgba(230, 197, 125, 0.96)";
+            ctx.lineWidth = 8;
+            ctx.strokeRect(19, 18, 218, 988);
+            ctx.strokeStyle = "rgba(230, 197, 125, 0.56)";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(31, 31, 194, 962);
+
+            /* Rotate the full title so it reads vertically along the spine. */
+            ctx.save();
+            ctx.translate(128, 512);
+            ctx.rotate(-Math.PI / 2);
+            ctx.fillStyle = "#fff0c7";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.shadowColor = "rgba(0,0,0,.95)";
+            ctx.shadowBlur = 5;
+            ctx.font = "bold 29px Georgia, 'Times New Roman', serif";
+            let fontSize = 29;
+            const maxTextWidth = 900;
+            while (ctx.measureText(title).width > maxTextWidth && fontSize > 15) {
+                fontSize -= 1;
+                ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
+            }
+            ctx.fillText(title, 0, 0, maxTextWidth);
+            ctx.restore();
+
+            const tex = new THREE.CanvasTexture(cv);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            titleIndexByName.set(title, index);
+            return tex;
+        });
+
         function shelf(x, z, ry) {
-            const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; scene.add(g); g.updateMatrix();
-            const W = 2.3, D = .45, H = 3.6, dm = new THREE.Object3D(), tc = new THREE.Color();
-            box(W, H, .05, 0x24170f, 0, H / 2, -D / 2 + .025, g); box(.07, H, D, 0x5a3a24, -W / 2, H / 2, 0, g); box(.07, H, D, 0x5a3a24, W / 2, H / 2, 0, g);
+            const g = new THREE.Group();
+            g.position.set(x, 0, z);
+            g.rotation.y = ry;
+            scene.add(g);
+            /* Ensure world transform is current before instancing shelf books. */
+            g.updateMatrix();
+            g.updateMatrixWorld(true);
+
+            const W = 2.3, D = .45, H = 3.6;
+            const dm = new THREE.Object3D();
+            const tc = new THREE.Color();
+
+            box(W, H, .05, 0x24170f, 0, H / 2, -D / 2 + .025, g);
+            box(.07, H, D, 0x5a3a24, -W / 2, H / 2, 0, g);
+            box(.07, H, D, 0x5a3a24, W / 2, H / 2, 0, g);
+
             for (let l = 0; l < 6; l++) {
-                const y = .08 + l * .68; box(W, .06, D, 0x6b4630, 0, y, 0, g);
+                const y = .08 + l * .68;
+                box(W, .06, D, 0x6b4630, 0, y, 0, g);
                 if (l === 5) continue;
+
                 let cx = -W / 2 + .12;
                 while (cx < W / 2 - .12 && bookN < 5190) {
-                    const w = .04 + Math.random() * .07, h = .38 + Math.random() * .22;
-                    if (Math.random() < .06) { cx += .13; continue; }
-                    dm.position.set(cx + w / 2, y + .03 + h / 2, 0); dm.rotation.set(0, 0, Math.random() < .04 ? .18 : 0); dm.scale.set(w, h, D - .12); dm.updateMatrix();
-                    bookMesh.setMatrixAt(bookN, g.matrix.clone().multiply(dm.matrix));
-                    bookMesh.setColorAt(bookN, tc.setHex(BCOL[Math.floor(Math.random() * BCOL.length)]).offsetHSL(0, 0, (Math.random() - .5) * .1)); bookN++; cx += w + .008;
+                    const w = .105 + Math.random() * .065;
+                    const h = .42 + Math.random() * .18;
+                    if (Math.random() < .045) {
+                        cx += .13;
+                        continue;
+                    }
+
+                    const bookColor = BCOL[Math.floor(Math.random() * BCOL.length)];
+                    dm.position.set(cx + w / 2, y + .03 + h / 2, 0);
+                    dm.rotation.set(0, 0, Math.random() < .04 ? .12 : 0);
+                    dm.scale.set(w, h, D - .12);
+                    dm.updateMatrix();
+
+                    bookMesh.setMatrixAt(bookN, g.matrixWorld.clone().multiply(dm.matrix));
+                    bookMesh.setColorAt(
+                        bookN,
+                        tc.setHex(bookColor).offsetHSL(0, 0, (Math.random() - .5) * .1)
+                    );
+
+                    /* Every placed book gets its own complete title. */
+                    const titleIndex = bookN % BOOK_TITLES.length;
+                    const labelLocal = new THREE.Vector3(
+                        cx + w / 2,
+                        y + .03 + h * .52,
+                        D / 2 + .008
+                    );
+                    titlePlacements[titleIndex].push({
+                        group: g,
+                        position: labelLocal,
+                        width: Math.max(.092, w * .94),
+                        height: Math.min(.48, h * .88)
+                    });
+
+                    bookN++;
+                    cx += w + .012;
                 }
             }
+
             box(W + .12, .1, D + .06, 0x4a2f1d, 0, H + .05, 0, g);
+            g.updateMatrixWorld(true);
         }
+
         for (let x = -9.6; x <= 9.7; x += 2.4) shelf(x, 12.62, Math.PI);
-        for (const z of [-5.6, -3.2, -.8, 1.6, 4, 6.4, 8.8, 11.2]) { shelf(-11.62, z, Math.PI / 2); shelf(11.62, z, -Math.PI / 2); }
-        bookMesh.count = bookN; bookMesh.instanceMatrix.needsUpdate = true; if (bookMesh.instanceColor) bookMesh.instanceColor.needsUpdate = true;
+        for (const z of [-5.6, -3.2, -.8, 1.6, 4, 6.4, 8.8, 11.2]) {
+            shelf(-11.62, z, Math.PI / 2);
+            shelf(11.62, z, -Math.PI / 2);
+        }
+
+        /* Convert local shelf positions to world-space instance matrices. */
+        const labelDummy = new THREE.Object3D();
+        for (let titleIndex = 0; titleIndex < BOOK_TITLES.length; titleIndex++) {
+            const placements = titlePlacements[titleIndex];
+            if (!placements.length) continue;
+
+            const labelMaterial = new THREE.MeshBasicMaterial({
+                map: titleTextures[titleIndex],
+                transparent: true,
+                alphaTest: .04,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                toneMapped: false
+            });
+            const labels = new THREE.InstancedMesh(
+                new THREE.PlaneGeometry(1, 1),
+                labelMaterial,
+                placements.length
+            );
+
+            for (let i = 0; i < placements.length; i++) {
+                const item = placements[i];
+                item.group.updateMatrixWorld(true);
+
+                const worldPosition = item.group.localToWorld(item.position.clone());
+                const worldQuaternion = item.group.getWorldQuaternion(new THREE.Quaternion());
+
+                labelDummy.position.copy(worldPosition);
+                labelDummy.quaternion.copy(worldQuaternion);
+                labelDummy.scale.set(item.width, item.height, 1);
+                labelDummy.updateMatrix();
+                labels.setMatrixAt(i, labelDummy.matrix);
+            }
+
+            labels.instanceMatrix.needsUpdate = true;
+            scene.add(labels);
+        }
+
+        bookMesh.count = bookN;
+        bookMesh.instanceMatrix.needsUpdate = true;
+        if (bookMesh.instanceColor) bookMesh.instanceColor.needsUpdate = true;
 
         /* rug + seats */
         const rugMat = new THREE.MeshStandardMaterial({
@@ -1917,7 +2155,53 @@
         const fire = []; const fireL = new THREE.PointLight(0xff8a3a, 8, 10, 2); fireL.userData.i0 = 8; fireL.position.set(0, .9, -6.6); scene.add(fireL);
         box(3.4, 1.3, .7, 0x6f6a66, 0, .65, -7.45); box(3.8, .1, .9, 0x8a8480, 0, 1.35, -7.4); box(1.7, .85, .2, 0x050505, 0, .5, -7.12);
         cyl(.08, .08, 1.1, 0x3a2314, -.3, .12, -7.0).rotation.z = Math.PI / 2; cyl(.08, .08, 1.1, 0x3a2314, .2, .2, -7.0).rotation.z = Math.PI / 2;
-        for (let i = 0; i < 5; i++) { const f = new THREE.Mesh(new THREE.ConeGeometry(.15, .6, 12), new THREE.MeshBasicMaterial({ color: i % 2 ? 0xff7a1a : 0xffb347, transparent: true, opacity: .9 })); f.position.set((i - 2) * .22, .45, -7.0); scene.add(f); fire.push(f); }
+        /* ---- layered procedural fireplace ---- */
+        const flameCanvas = (inner, outer, seed = 0) => {
+            const c = document.createElement("canvas"); c.width = 256; c.height = 512;
+            const x = c.getContext("2d");
+            const g = x.createLinearGradient(0, 512, 0, 0);
+            g.addColorStop(0, inner); g.addColorStop(.34, "#ffb52e"); g.addColorStop(.68, outer); g.addColorStop(1, "rgba(255,90,12,0)");
+            x.fillStyle = g; x.beginPath(); x.moveTo(128, 512);
+            x.bezierCurveTo(28, 420, 45, 310, 100, 220);
+            x.bezierCurveTo(88, 150, 154, 105 + seed * 8, 148, 18);
+            x.bezierCurveTo(245, 130, 190, 190, 222, 270);
+            x.bezierCurveTo(260, 370, 220, 455, 128, 512); x.closePath(); x.fill();
+            const glow = x.createRadialGradient(128, 390, 8, 128, 390, 150);
+            glow.addColorStop(0, "rgba(255,246,190,.9)"); glow.addColorStop(.35, "rgba(255,177,48,.25)"); glow.addColorStop(1, "rgba(255,100,0,0)");
+            x.globalCompositeOperation = "screen"; x.fillStyle = glow; x.fillRect(0, 220, 256, 292);
+            return new THREE.CanvasTexture(c);
+        };
+        const flameMats = [
+            new THREE.MeshBasicMaterial({ map: flameCanvas("#fff4bd", "#ff5a12", 0), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: .95, side: THREE.DoubleSide }),
+            new THREE.MeshBasicMaterial({ map: flameCanvas("#fff0a0", "#ff8a16", 1), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: .8, side: THREE.DoubleSide }),
+            new THREE.MeshBasicMaterial({ map: flameCanvas("#fff9d6", "#ff3d0a", 2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: .72, side: THREE.DoubleSide })
+        ];
+        for (let i = 0; i < 9; i++) {
+            const f = new THREE.Mesh(new THREE.PlaneGeometry(.34 + (i % 3) * .12, .72 + (i % 4) * .13), flameMats[i % flameMats.length]);
+            f.position.set((i - 4) * .19, .52 + (i % 3) * .035, -7.015 + (i % 2) * .025);
+            f.rotation.z = (i - 4) * .055; scene.add(f); fire.push(f);
+        }
+        const emberGeo = new THREE.BufferGeometry(), emberCount = 34;
+        const emberPos = new Float32Array(emberCount * 3), emberVel = [];
+        for (let i = 0; i < emberCount; i++) {
+            emberPos[i * 3] = (Math.random() - .5) * 1.45;
+            emberPos[i * 3 + 1] = .3 + Math.random() * 1.1;
+            emberPos[i * 3 + 2] = -7.0 + (Math.random() - .5) * .16;
+            emberVel.push(.12 + Math.random() * .42);
+        }
+        emberGeo.setAttribute("position", new THREE.BufferAttribute(emberPos, 3));
+        const embers = new THREE.Points(emberGeo, new THREE.PointsMaterial({ color: 0xffbd58, size: .045, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false }));
+        scene.add(embers);
+        const smoke = [];
+        for (let i = 0; i < 7; i++) {
+            const sm = new THREE.Mesh(new THREE.SphereGeometry(.09 + Math.random() * .08, 8, 8),
+                new THREE.MeshBasicMaterial({ color: 0x77717b, transparent: true, opacity: .075, depthWrite: false }));
+            sm.position.set((Math.random() - .5) * .55, 1.05 + i * .12, -7.03); scene.add(sm);
+            smoke.push({ mesh: sm, phase: Math.random() * Math.PI * 2, speed: .12 + Math.random() * .12 });
+        }
+        const fireGlow = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.7),
+            new THREE.MeshBasicMaterial({ color: 0xff7626, transparent: true, opacity: .14, blending: THREE.AdditiveBlending, depthWrite: false }));
+        fireGlow.position.set(0, .72, -6.91); scene.add(fireGlow);
         solid(-1.1, -7.2, .8); solid(1.1, -7.2, .8);
         nook(-8, 9.5, -Math.PI / 2, 0x3f5a2f, 0x6b3a22); nook(8, 9.5, Math.PI / 2, 0x4a2f6b, 0x1f5a5a);
 
@@ -1953,105 +2237,230 @@
             document.body.appendChild(v); return v;
         }
         function makeMedia() { const v = makeVid(); const tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace; return { v, tex, stream: null }; }
-        function makeAvatar(name, id, gd) {
+function makeAvatar(name, id, gd) {
             const g = new THREE.Group(), h = hueOf(id), F = gd === "f";
-            const SK = ["#f6d3b8", "#e8b998", "#c98f66", "#9a6440", "#6e4329"][h % 5], HC = ["#1d1410", "#3b2415", "#6a4023", "#b88a3e", "#7b2c1b", "#0d0d10"][(h >> 3) % 6], EC = ["#3b2a1a", "#2e6a9a", "#3a7b4a", "#6a4a22"][(h >> 5) % 4];
-            const shirtC = new THREE.Color(F ? `hsl(${(h * 7) % 360},45%,64%)` : `hsl(${h},50%,40%)`), pantC = F ? new THREE.Color(`hsl(${(h + 30) % 360},35%,30%)`) : new THREE.Color(0x2b3552), skin = new THREE.Color(SK), acc = new THREE.Color(`hsl(${(h + 140) % 360},60%,55%)`);
+            /* ================= PALETTE ================= */
+            const SK = ["#fde8d8", "#f9dcc6", "#f4d0b2", "#eec4a2"][h % 4];
+            const HC = F ? ["#f8e6ae", "#f1d484", "#fbf0cc", "#eac56e", "#f4dc9c"][(h >> 3) % 5]
+                : ["#f5e3b0", "#efd698", "#f8ebc6", "#ecd08c", "#f2deaa"][(h >> 3) % 5];      // creamy golden
+            const EC = ["#2f9cf0", "#1fc28f", "#5a7dff", "#9470ff", "#14b8cc", "#5cc83c"][(h >> 5) % 6];
+            const sty = c => new THREE.Color(c);
+            const ECl = sty(EC).offsetHSL(0, .05, .24).getStyle(), ECd = sty(EC).offsetHSL(0, 0, -.25).getStyle();
+            const HCd = sty(HC).offsetHSL(0, .06, -.2).getStyle(), HCl = sty(HC).offsetHSL(0, 0, .1).getStyle(), HCw = sty(HC).offsetHSL(0, .1, -.08).getStyle();
+            const style = (h >> 7) % (F ? 4 : 3);
+            const navy = sty(F && h % 2 ? "hsl(350,38%,28%)" : "hsl(225,36%,26%)");
+            const shirtC = sty(0xfbfbfd), pantC = sty(F ? (h % 2 ? "hsl(350,40%,30%)" : "hsl(225,40%,30%)") : "hsl(220,10%,32%)");
+            const skin = sty(SK), acc = sty(`hsl(${(h + 140) % 360},65%,62%)`), gold = M0(0xe6c46a);
+            function M0(c) { return new THREE.MeshStandardMaterial({ color: c, metalness: .9, roughness: .22 }); }
             const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: .7, ...o });
             const add = (geo, m, p, x, y, z, sx = 1, sy = 1, sz = 1) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); p.add(o); return o; };
             const CAP = (r, l) => new THREE.CapsuleGeometry(r, l, 8, 16), SPH = r => new THREE.SphereGeometry(r, 24, 18), RB = (w, hh, d, r = .02) => new RoundedBoxGeometry(w, hh, d, 3, r);
-            const fabric = ctex(cvs(64, 64, c => { c.fillStyle = "#808080"; c.fillRect(0, 0, 128, 128); c.strokeStyle = "rgba(0,0,0,.35)"; c.lineWidth = 2; for (let i = 0; i < 128; i += 6) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 128); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(128, i); c.stroke(); } }), 5, 5);
+
+            /* ================= TEXTURES ================= */
+            const fabric = ctex(cvs(64, 64, c => { c.fillStyle = "#808080"; c.fillRect(0, 0, 128, 128); c.strokeStyle = "rgba(0,0,0,.3)"; c.lineWidth = 2; for (let i = 0; i < 128; i += 6) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 128); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(128, i); c.stroke(); } }), 5, 5);
             const pleat = ctex(cvs(32, 32, c => { const gr = c.createLinearGradient(0, 0, 64, 0); gr.addColorStop(0, "#222"); gr.addColorStop(.5, "#ddd"); gr.addColorStop(1, "#222"); c.fillStyle = gr; c.fillRect(0, 0, 64, 64); }), 18, 1);
-            const hairTex = ctex(cvs(128, 128, c => { c.fillStyle = HC; c.fillRect(0, 0, 128, 128); for (let i = 0; i < 150; i++) { c.strokeStyle = `rgba(${Math.random() < .5 ? "255,255,255" : "0,0,0"},${.05 + Math.random() * .1})`; c.lineWidth = 1 + Math.random() * 1.5; const x = Math.random() * 128; c.beginPath(); c.moveTo(x, 0); c.bezierCurveTo(x + Math.random() * 15 - 7, 40, x + Math.random() * 15 - 7, 85, x + Math.random() * 10 - 5, 128); c.stroke(); } }));
-            const face = ctex(cvs(1024, 512, c => {
-                c.scale(.5, .5); // Draw at the original design coordinates into a half-size texture.
-                const cx = 1536; c.fillStyle = SK; c.fillRect(0, 0, 2048, 1024);
-                for (let i = 0; i < 2600; i++) { c.fillStyle = `rgba(${Math.random() < .5 ? "255,235,220" : "90,50,40"},${.03 + Math.random() * .04})`; c.fillRect(Math.random() * 2048, Math.random() * 1024, 2, 2); }
-                const jg = c.createLinearGradient(0, 700, 0, 1024); jg.addColorStop(0, "rgba(80,40,30,0)"); jg.addColorStop(1, "rgba(80,40,30,.28)"); c.fillStyle = jg; c.fillRect(0, 700, 2048, 324);
-                const blush = (x, y) => { const r = c.createRadialGradient(x, y, 4, x, y, 75); r.addColorStop(0, F ? "rgba(230,110,120,.42)" : "rgba(190,90,80,.18)"); r.addColorStop(1, "rgba(230,110,120,0)"); c.fillStyle = r; c.fillRect(x - 80, y - 80, 160, 160); };
-                blush(cx - 118, 595); blush(cx + 118, 595);
-                if (h % 3 === 0) { c.fillStyle = "rgba(150,90,60,.45)"; for (let i = 0; i < 46; i++) { const a = Math.random() * 6.28, r = Math.random() * 90; c.beginPath(); c.arc(cx + Math.cos(a) * r * 1.5, 560 + Math.sin(a) * r * .35, 1.8, 0, 7); c.fill(); } }
-                [-1, 1].forEach(s => {
-                    const ex = cx + s * 56, ey = 490;
-                    if (F) { c.fillStyle = "rgba(190,110,160,.16)"; c.beginPath(); c.ellipse(ex, ey - 14, 34, 20, 0, 0, 7); c.fill(); }
-                    c.fillStyle = "rgba(90,50,40,.2)"; c.beginPath(); c.ellipse(ex, ey - 6, 31, 18, 0, 0, 7); c.fill();
-                    c.save(); c.beginPath(); c.ellipse(ex, ey, 23, 13, 0, 0, 7); c.clip(); c.fillStyle = "#f8f5ef"; c.fillRect(ex - 30, ey - 20, 60, 40);
-                    const sh = c.createLinearGradient(0, ey - 13, 0, ey + 13); sh.addColorStop(0, "rgba(120,70,60,.45)"); sh.addColorStop(.35, "rgba(120,70,60,0)"); c.fillStyle = sh; c.fillRect(ex - 30, ey - 20, 60, 40);
-                    const ig = c.createRadialGradient(ex, ey, 1, ex, ey, 12.5); ig.addColorStop(0, "#050505"); ig.addColorStop(.3, "#050505"); ig.addColorStop(.34, EC); ig.addColorStop(.85, EC); ig.addColorStop(1, "#10161a");
-                    c.fillStyle = ig; c.beginPath(); c.arc(ex, ey + 1, 12.5, 0, 7); c.fill(); c.fillStyle = "rgba(255,255,255,.9)"; c.beginPath(); c.arc(ex - 4.5, ey - 4, 3.2, 0, 7); c.fill(); c.beginPath(); c.arc(ex + 4, ey + 4, 1.6, 0, 7); c.fill(); c.restore();
-                    c.strokeStyle = "#241410"; c.lineWidth = F ? 5 : 3.6; c.lineCap = "round"; c.beginPath(); c.ellipse(ex, ey, 23, 13, 0, Math.PI * 1.03, Math.PI * 1.97); c.stroke();
-                    c.strokeStyle = "rgba(60,30,25,.35)"; c.lineWidth = 2; c.beginPath(); c.ellipse(ex, ey - 6, 25, 14, 0, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
-                    c.strokeStyle = "rgba(120,60,50,.3)"; c.beginPath(); c.ellipse(ex, ey, 22, 12, 0, .1, Math.PI - .1); c.stroke();
-                    if (F) for (let k = 0; k < 6; k++) { c.strokeStyle = "#1a0f0c"; c.lineWidth = 2.6; c.beginPath(); c.moveTo(ex + s * (2 + k * 4.2), ey - 12.5); c.quadraticCurveTo(ex + s * (6 + k * 5), ey - 18, ex + s * (9 + k * 5.4), ey - 21 + k * .6); c.stroke(); }
-                    for (let k = 0; k < 30; k++) { const t = k / 29, bx = ex - s * 26 + s * 60 * t, by = 446 - 24 * Math.sin(Math.PI * t * .9) + (t > .7 ? (t - .7) * 30 : 0); c.strokeStyle = HC; c.lineWidth = F ? 2.4 : 3.4; c.beginPath(); c.moveTo(bx, by + 5); c.lineTo(bx + s * 6, by - 4 + (1 - t) * 2); c.stroke(); }
-                    c.strokeStyle = "rgba(120,70,50,.2)"; c.lineWidth = 6; c.beginPath(); c.moveTo(cx + s * 12, 510); c.lineTo(cx + s * 14, 560); c.stroke(); c.fillStyle = "rgba(70,30,25,.5)"; c.beginPath(); c.ellipse(cx + s * 12, 578, 5, 4, 0, 0, 7); c.fill();
-                });
-                c.fillStyle = "rgba(120,70,50,.26)"; c.beginPath(); c.ellipse(cx, 572, 15, 9, 0, 0, 7); c.fill(); c.fillStyle = "rgba(255,235,220,.22)"; c.beginPath(); c.ellipse(cx, 562, 7, 5, 0, 0, 7); c.fill();
-                c.fillStyle = F ? "#c25468" : "#b8625a"; c.beginPath(); c.moveTo(cx - 30, 650); c.quadraticCurveTo(cx - 12, 634, cx, 640); c.quadraticCurveTo(cx + 12, 634, cx + 30, 650); c.quadraticCurveTo(cx, 676, cx - 30, 650); c.fill();
-                c.fillStyle = "rgba(255,255,255,.28)"; c.beginPath(); c.ellipse(cx, 659, 10, 3, 0, 0, 7); c.fill(); c.strokeStyle = "#6a2a2e"; c.lineWidth = 2.5; c.beginPath(); c.moveTo(cx - 30, 650); c.quadraticCurveTo(cx, 657, cx + 30, 650); c.stroke();
+            const plaid = ctex(cvs(128, 128, c => {
+                c.fillStyle = "#" + pantC.getHexString(); c.fillRect(0, 0, 128, 128);
+                c.fillStyle = "rgba(255,255,255,.28)"; [20, 84].forEach(p => { c.fillRect(p, 0, 6, 128); c.fillRect(0, p, 128, 6); });
+                c.fillStyle = "rgba(0,0,0,.28)"; [48, 112].forEach(p => { c.fillRect(p, 0, 14, 128); c.fillRect(0, p, 128, 14); });
+                c.fillStyle = "rgba(230,196,106,.55)"; c.fillRect(60, 0, 2, 128); c.fillRect(0, 60, 128, 2);
+            }), 7, 2);
+            const hairTex = ctex(cvs(256, 256, c => {
+                const bg = c.createLinearGradient(0, 0, 0, 256); bg.addColorStop(0, HCl); bg.addColorStop(.5, HC); bg.addColorStop(1, HCw); c.fillStyle = bg; c.fillRect(0, 0, 256, 256);
+                for (let i = 0; i < 420; i++) {
+                    const lt_ = Math.random() < .6; c.strokeStyle = lt_ ? `rgba(255,252,232,${.1 + Math.random() * .24})` : `rgba(170,120,50,${.05 + Math.random() * .13})`;
+                    c.lineWidth = .7 + Math.random() * 1.8; const x = Math.random() * 256;
+                    c.beginPath(); c.moveTo(x, 0); c.bezierCurveTo(x + Math.random() * 34 - 17, 80, x + Math.random() * 34 - 17, 170, x + Math.random() * 20 - 10, 256); c.stroke();
+                }
+                const band = c.createLinearGradient(0, 50, 0, 120); band.addColorStop(0, "rgba(255,253,236,0)"); band.addColorStop(.5, "rgba(255,253,236,.32)"); band.addColorStop(1, "rgba(255,253,236,0)"); c.fillStyle = band; c.fillRect(0, 50, 256, 70);
             }));
-            const legs = new THREE.Group(), upper = new THREE.Group(), head = new THREE.Group(); head.position.y = 1.7; upper.add(head);
-            add(new THREE.SphereGeometry(.2, 64, 48), M(0xffffff, { map: face, roughness: .6 }), head, 0, 0, 0, .9, 1.08, 1); add(SPH(.1), M(skin), head, 0, -.15, -.07, .95, .8, .9);
-            const hm = new THREE.MeshPhysicalMaterial({ map: hairTex, bumpMap: hairTex, bumpScale: .6, roughness: .4, sheen: 1, sheenColor: new THREE.Color(0x99887a), sheenRoughness: .45, side: THREE.DoubleSide });
-            add(new THREE.SphereGeometry(.208, 48, 24, 0, Math.PI * 2, 0, Math.PI * .36), hm, head, 0, .002, 0, .9, 1.08, 1);
-            add(new THREE.SphereGeometry(.208, 48, 32, Math.PI * 1.5 + .62, Math.PI * 2 - 1.24, 0, Math.PI * .62), hm, head, 0, .002, 0, .9, 1.08, 1);
-            [-.11, -.04, .04, .11].forEach(x => add(SPH(.06), hm, head, x, .105 - Math.abs(x) * .25, -.17, 1.1, F ? 1.1 : .75, .7));
-            if (F) {
-                [-1, 1].forEach(s => add(CAP(.03, .42), hm, head, .17 * s, -.24, -.07).rotation.z = .04 * s);
-                const bw = new THREE.Group(); bw.position.set(.13, .2, -.05); head.add(bw); add(new THREE.ConeGeometry(.06, .09, 12), M(acc), bw, -.06, 0, 0).rotation.z = Math.PI / 2; add(new THREE.ConeGeometry(.06, .09, 12), M(acc), bw, .06, 0, 0).rotation.z = -Math.PI / 2; add(SPH(.025), M(acc), bw, 0, 0, 0);
-                if (h % 2) { add(CAP(.045, .3), hm, head, 0, -.12, .25).rotation.x = .4; add(SPH(.06), M(acc), head, 0, 0, .22); }
-                else add(new THREE.LatheGeometry([[.06, 0], [.2, -.01], [.27, -.14], [.285, -.32], [.26, -.52], [.2, -.62], [.07, -.65]].map(([r, y]) => new THREE.Vector2(r, y)), 32, -1.25, 2.5), hm, head, 0, -.02, 0);
-            } else {
-                add(SPH(.1), hm, head, 0, .2, -.09, 1.5, .75, 1.3).rotation.x = -.25;
+
+            /* ---- fresh youthful face: huge sparkling eyes, soft blush, gentle smile ---- */
+            const face = ctex(cvs(1536, 768, c => {
+                c.scale(.75, .75);
+                const cx = 1536; c.lineCap = "round";
+                c.fillStyle = SK; c.fillRect(0, 0, 2048, 1024);
+                for (let i = 0; i < 2400; i++) { c.fillStyle = `rgba(${Math.random() < .5 ? "255,244,234" : "180,120,100"},${.015 + Math.random() * .03})`; c.fillRect(Math.random() * 2048, Math.random() * 1024, 2, 2); }
+                const glow = (x, y, r, col) => { const q = c.createRadialGradient(x, y, 2, x, y, r); q.addColorStop(0, col); q.addColorStop(1, col.replace(/[\d.]+\)$/, "0)")); c.fillStyle = q; c.fillRect(x - r, y - r, r * 2, r * 2); };
+                glow(cx, 400, 270, "rgba(255,250,244,.36)"); glow(cx, 560, 70, "rgba(255,250,244,.2)");
+                [-1, 1].forEach(s => { glow(cx + s * 150, 575, 95, "rgba(255,249,242,.22)"); glow(cx + s * 128, 616, 92, F ? "rgba(246,128,142,.34)" : "rgba(226,130,115,.17)"); });
+                const jg = c.createLinearGradient(0, 740, 0, 1024); jg.addColorStop(0, "rgba(120,70,50,0)"); jg.addColorStop(1, "rgba(120,70,50,.2)"); c.fillStyle = jg; c.fillRect(0, 740, 2048, 284);
+                if (h % 4 === 0) { c.fillStyle = "rgba(195,125,85,.3)"; for (let i = 0; i < 38; i++) { const a = Math.random() * 6.28, r = Math.random() * 95; c.beginPath(); c.arc(cx + Math.cos(a) * r * 1.6, 580 + Math.sin(a) * r * .3, 1.6, 0, 7); c.fill(); } }
+
                 [-1, 1].forEach(s => {
-                    add(CAP(.018, .07), hm, head, .175 * s, -.06, -.05);
-                    // Short textured side locks and a subtle ear stud.
-                    add(CAP(.035, .16), hm, head, .17 * s, -.13, -.025).rotation.z = -.12 * s;
+                    const ex = cx + s * 72, ey = 494, rx = 43, ry = 30;
+                    const sg = c.createRadialGradient(ex, ey - 14, 4, ex, ey - 14, rx + 12); sg.addColorStop(0, F ? "rgba(230,160,175,.22)" : "rgba(170,120,100,.14)"); sg.addColorStop(1, "rgba(230,160,175,0)"); c.fillStyle = sg; c.fillRect(ex - 70, ey - 70, 140, 100);
+                    c.strokeStyle = "rgba(120,70,60,.3)"; c.lineWidth = 3; c.beginPath(); c.ellipse(ex, ey - 12, rx + 4, ry + 2, 0, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+                    c.save(); c.beginPath(); c.ellipse(ex, ey, rx, ry, 0, 0, 7); c.clip();
+                    c.fillStyle = "#fcfaf7"; c.fillRect(ex - 55, ey - 38, 110, 76);
+                    const es = c.createLinearGradient(0, ey - ry, 0, ey + ry); es.addColorStop(0, "rgba(110,70,75,.5)"); es.addColorStop(.42, "rgba(110,70,75,0)"); c.fillStyle = es; c.fillRect(ex - 55, ey - 38, 110, 76);
+                    const ir = 28, iy = ey + 1;
+                    const ig = c.createRadialGradient(ex, iy, 2, ex, iy, ir);
+                    ig.addColorStop(0, "#03050a"); ig.addColorStop(.28, "#03050a"); ig.addColorStop(.32, ECl); ig.addColorStop(.6, EC); ig.addColorStop(.88, ECd); ig.addColorStop(1, "#080f16");
+                    c.fillStyle = ig; c.beginPath(); c.arc(ex, iy, ir, 0, 7); c.fill();
+                    c.strokeStyle = "rgba(255,255,255,.18)"; c.lineWidth = 1.3;
+                    for (let k = 0; k < 44; k++) { const a = k / 44 * 6.283; c.beginPath(); c.moveTo(ex + Math.cos(a) * 10, iy + Math.sin(a) * 10); c.lineTo(ex + Math.cos(a) * 23, iy + Math.sin(a) * 23); c.stroke(); }
+                    glow(ex, iy + 16, 18, "rgba(255,255,255,.42)");
+                    c.strokeStyle = "rgba(5,10,16,.6)"; c.lineWidth = 3; c.beginPath(); c.arc(ex, iy, ir - 1.5, 0, 7); c.stroke();
+                    c.fillStyle = "rgba(255,255,255,.98)"; c.beginPath(); c.arc(ex - 10, iy - 10, 8, 0, 7); c.fill();
+                    c.beginPath(); c.arc(ex + 10, iy + 9, 3.8, 0, 7); c.fill();
+                    c.fillStyle = "rgba(255,255,255,.7)"; c.beginPath(); c.arc(ex + 3, iy - 16, 2.2, 0, 7); c.fill(); c.beginPath(); c.arc(ex - 15, iy + 4, 1.8, 0, 7); c.fill();
+                    c.restore();
+                    c.strokeStyle = "#2a1712"; c.lineWidth = F ? 6 : 4.6; c.beginPath(); c.ellipse(ex, ey, rx, ry, 0, Math.PI * 1.02, Math.PI * 1.98); c.stroke();
+                    c.strokeStyle = "rgba(130,70,60,.3)"; c.lineWidth = 2; c.beginPath(); c.ellipse(ex, ey, rx - 1, ry - 1, 0, .12, Math.PI - .12); c.stroke();
+                    // soft natural lashes
+                    c.strokeStyle = F ? "#1a0e0a" : "rgba(40,25,18,.85)"; c.lineWidth = F ? 3 : 2;
+                    const NL = F ? 11 : 8;
+                    for (let k = 0; k < NL; k++) {
+                        const t = k / (NL - 1), th = Math.PI * (1.05 + t * .9), px_ = ex + rx * Math.cos(th), py_ = ey + ry * Math.sin(th), to = s === 1 ? t : 1 - t, len = (F ? 10 : 7) + (F ? 12 : 5) * to;
+                        c.beginPath(); c.moveTo(px_, py_); c.quadraticCurveTo(px_ + Math.cos(th) * len * .6 + s * len * .15 * to, py_ + Math.sin(th) * len * .85, px_ + Math.cos(th) * len * .85 + s * len * .4 * to, py_ + Math.sin(th) * len * 1.15 - 2); c.stroke();
+                    }
+                    // brows
+                    c.strokeStyle = HCd; const base = F ? 10 : 14, N = 18; let pv = null;
+                    for (let i = 0; i <= N; i++) {
+                        const t = i / N, bx = ex - s * 44 + s * 100 * t, by = F ? 430 - 22 * Math.sin(Math.PI * t * .95) + (t > .7 ? (t - .7) * 50 : 0) : 432 - 8 * Math.sin(Math.PI * t * .9) + t * 8;
+                        if (pv) { c.lineWidth = base * (1 - t * .65) + 2; c.beginPath(); c.moveTo(pv[0], pv[1]); c.lineTo(bx, by); c.stroke(); } pv = [bx, by];
+                    }
+                    c.fillStyle = "rgba(235,140,140,.5)"; c.beginPath(); c.arc(ex - s * (rx - 5), ey + 3, 3.4, 0, 7); c.fill();
+                    glow(ex - s * 24, ey - 26, 10, "rgba(255,255,255,.5)");
                 });
-                add(CAP(.035, .13), hm, head, -.07, .13, -.17).rotation.z = -.25;
-                add(CAP(.035, .13), hm, head, .04, .15, -.17).rotation.z = .18;
+                // tiny cute nose
+                [-1, 1].forEach(s => { c.strokeStyle = "rgba(130,80,60,.17)"; c.lineWidth = 6; c.beginPath(); c.moveTo(cx + s * 12, 524); c.lineTo(cx + s * 14, 572); c.stroke(); c.fillStyle = "rgba(90,40,35,.38)"; c.beginPath(); c.ellipse(cx + s * 10, 586, 4.2, 3.4, 0, 0, 7); c.fill(); });
+                c.fillStyle = "rgba(130,80,60,.18)"; c.beginPath(); c.ellipse(cx, 580, 13, 7, 0, 0, 7); c.fill();
+                c.fillStyle = "rgba(255,248,240,.45)"; c.beginPath(); c.ellipse(cx, 566, 5.5, 11, 0, 0, 7); c.fill();
+                // gentle, natural smile
+                const lipU = F ? "#e08088" : "#cd8479", lipL = F ? "#ec9aa0" : "#d99588";
+                c.fillStyle = lipU; c.beginPath(); c.moveTo(cx - 36, 654); c.quadraticCurveTo(cx - 15, 637, cx, 645); c.quadraticCurveTo(cx + 15, 637, cx + 36, 654); c.quadraticCurveTo(cx, 666, cx - 36, 654); c.fill();
+                c.fillStyle = lipL; c.beginPath(); c.moveTo(cx - 36, 654); c.quadraticCurveTo(cx, 667, cx + 36, 654); c.quadraticCurveTo(cx + 20, 693, cx, 694); c.quadraticCurveTo(cx - 20, 693, cx - 36, 654); c.fill();
+                c.fillStyle = "rgba(255,255,255,.4)"; c.beginPath(); c.ellipse(cx - 3, 678, 12, 3.6, 0, 0, 7); c.fill();
+                c.strokeStyle = "#8a4a48"; c.lineWidth = 2.5; c.beginPath(); c.moveTo(cx - 38, 652); c.quadraticCurveTo(cx, 668, cx + 38, 652); c.stroke();
+                c.fillStyle = "rgba(150,90,80,.3)"; [-1, 1].forEach(s => { c.beginPath(); c.arc(cx + s * 42, 651, 3, 0, 7); c.fill(); });
+                /* tiny skin highlights and delicate lower-lash accents */
+                [-1, 1].forEach(s => {
+                    const ex = cx + s * 72;
+                    const sheen = c.createRadialGradient(ex - 12, 486, 1, ex - 12, 486, 20);
+                    sheen.addColorStop(0, "rgba(255,255,255,.36)"); sheen.addColorStop(1, "rgba(255,255,255,0)");
+                    c.fillStyle = sheen; c.fillRect(ex - 34, 458, 44, 52);
+                    c.strokeStyle = "rgba(65,38,34,.42)"; c.lineWidth = 1.8;
+                    for (let k = 0; k < 4; k++) {
+                        const lx = ex - 24 + k * 16;
+                        c.beginPath(); c.moveTo(lx, 520); c.quadraticCurveTo(lx + s * 2, 527, lx + s * 5, 529); c.stroke();
+                    }
+                });
+                /* faint freckles, intentionally sparse and softly blended */
+                if (h % 3 === 1) {
+                    c.fillStyle = "rgba(125,75,62,.18)";
+                    for (let i = 0; i < 12; i++) {
+                        const side = i < 6 ? -1 : 1, n = i % 6;
+                        c.beginPath(); c.arc(cx + side * (38 + n * 8), 598 + (n % 3) * 5, 1.5 + (n % 2) * .5, 0, 7); c.fill();
+                    }
+                }
+            }));
+
+            /* ================= HEAD (soft, youthful, rounded) ================= */
+            const legs = new THREE.Group(), upper = new THREE.Group(), head = new THREE.Group(); head.position.y = 1.7; head.scale.set(1.08, 1.08, 1.08); upper.add(head);
+            const hg = new THREE.SphereGeometry(.2, 64, 48), hp = hg.attributes.position, tp = F ? .2 : .13;
+            for (let i = 0; i < hp.count; i++) { const x = hp.getX(i), y = hp.getY(i), z = hp.getZ(i), yn = y / .2; if (yn < 0) { const k = Math.pow(-yn, 1.5); hp.setXYZ(i, x * (1 - tp * k), y, z * (1 - .08 * k)); } }
+            hg.computeVertexNormals();
+            add(hg, M(0xffffff, { map: face, roughness: .5 }), head, 0, 0, 0, .9, 1.08, 1);
+            add(SPH(.024), M(skin), head, 0, -.04, -.205, 1, 1.1, 1.2);
+            [-1, 1].forEach(s => add(SPH(.04), M(skin), head, .18 * s, -.01, 0, .5, 1, .8));
+
+            /* ================= HAIR ================= */
+            const hm = new THREE.MeshPhysicalMaterial({ map: hairTex, bumpMap: hairTex, bumpScale: .45, roughness: F ? .3 : .5, metalness: .04, sheen: 1, sheenColor: new THREE.Color(0xfff6d2), sheenRoughness: .4, clearcoat: F ? .35 : .15, clearcoatRoughness: .4, side: THREE.DoubleSide });
+            const taper = (pts, r0, r1) => {
+                const cu_ = new THREE.CatmullRomCurve3(pts), seg = 24, rad = 7, geo = new THREE.TubeGeometry(cu_, seg, 1, rad, false), p = geo.attributes.position;
+                for (let i = 0; i <= seg; i++) { const c = cu_.getPointAt(i / seg), r = r0 + (r1 - r0) * Math.pow(i / seg, .85); for (let j = 0; j <= rad; j++) { const k = i * (rad + 1) + j; p.setXYZ(k, c.x + (p.getX(k) - c.x) * r, c.y + (p.getY(k) - c.y) * r, c.z + (p.getZ(k) - c.z) * r); } }
+                geo.computeVertexNormals(); return new THREE.Mesh(geo, hm);
+            };
+            const path = (arr, r0, r1, parent = head) => { const m = taper(arr.map(a => new THREE.Vector3(...a)), r0, r1); parent.add(m); return m; };
+            const lock = (x0, y0, z0, len, dx, dz, amp, fr, ph, r0 = .036, r1 = .012, parent = head) => {
+                const pts = []; for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push([x0 + dx * t + Math.sin(t * fr + ph) * amp * (.3 + t), y0 - t * len, z0 + dz * t + Math.cos(t * fr + ph) * amp * .55 * (.3 + t)]); }
+                return path(pts, r0, r1, parent);
+            };
+            add(new THREE.SphereGeometry(.213, 48, 24, 0, Math.PI * 2, 0, Math.PI * .4), hm, head, 0, .004, 0, .92, 1.1, 1.05);
+            add(new THREE.SphereGeometry(.213, 48, 32, Math.PI * 1.5 + .6, Math.PI * 2 - 1.2, 0, Math.PI * .68), hm, head, 0, .004, 0, .92, 1.1, 1.05);
+            if (F) {
+                add(SPH(.1), hm, head, 0, .17, -.01, 1.9, .85, 1.5);
+                // soft curtain bangs + wispy strands
+                [-1, 1].forEach(s => {
+                    for (let k = 0; k < 3; k++) path([[s * .015, .2, -.1 - k * .01], [s * (.07 + k * .02), .15, -.19], [s * (.15 + k * .01), .05 - k * .02, -.16], [s * (.19 + k * .01), -.06 - k * .03, -.09]], .046 - k * .006, .01);
+                    path([[s * .03, .19, -.14], [s * .06, .14, -.2], [s * .09, .09, -.205]], .014, .004);
+                });
+                if (style === 1) {                  // high ponytail + scrunchie
+                    add(new THREE.TorusGeometry(.045, .02, 8, 16), M(acc), head, 0, .16, .185).rotation.x = 1.2;
+                    for (let k = 0; k < 7; k++) lock((k - 3) * .014, .16, .2, .6 + (k % 3) * .05, 0, .1, .05, 6, k * 1.2, .034, .01);
+                } else if (style === 3) {           // low twin tails with ribbons
+                    [-1, 1].forEach(s => {
+                        add(new THREE.ConeGeometry(.04, .07, 10), M(acc), head, s * .15, -.0, .12, 1, 1, 1).rotation.z = Math.PI / 2 * s;
+                        add(new THREE.ConeGeometry(.04, .07, 10), M(acc), head, s * .2, -.0, .12, 1, 1, 1).rotation.z = -Math.PI / 2 * s;
+                        add(SPH(.02), M(acc), head, s * .175, 0, .12);
+                        for (let k = 0; k < 5; k++) lock(s * (.18 + (k - 2) * .012), -.02, .12 + (k - 2) * .014, .52 + (k % 2) * .05, s * .04, .04, .04, 6, k * 1.1 + s, .034, .01);
+                    });
+                    for (let i = 0; i < 5; i++) { const x = -.1 + i * .05; lock(x, .03, .19, .16, 0, .02, .02, 6, i, .04, .015); }
+                } else {                            // long glossy waves (+ bow for style 2, star clip for style 0)
+                    for (let i = 0; i < 9; i++) { const x = -.17 + i * .0425, z0 = Math.sqrt(Math.max(.003, .2 * .2 - (x / .92) * (x / .92))) + .01; lock(x, .02, z0, .66 - Math.abs(i - 4) * .035, 0, .035, .038, 6.4, i * 1.3, .04, .012); }
+                    [-1, 1].forEach(s => { lock(s * .2, -.02, -.025, .5, s * .045, -.01, .03, 5.6, s > 0 ? 0 : 2, .036, .011); lock(s * .212, -.01, 0, .46, s * .05, 0, .028, 5, s > 0 ? 1 : 3, .032, .01); });
+                    if (style === 2) { const bw = new THREE.Group(); bw.position.set(0, .245, .02); head.add(bw); add(new THREE.ConeGeometry(.075, .12, 12), M(acc), bw, -.075, 0, 0).rotation.z = Math.PI / 2; add(new THREE.ConeGeometry(.075, .12, 12), M(acc), bw, .075, 0, 0).rotation.z = -Math.PI / 2; add(SPH(.032), M(acc), bw, 0, 0, 0); }
+                    else { [[.16, .13], [.2, .09]].forEach(([x, y], i) => add(new THREE.OctahedronGeometry(.02 + (i ? 0 : .008), 0), gold, head, -x, y, -.15)); }
+                }
+                if (style === 1 || style === 3) [-1, 1].forEach(s => { lock(s * .2, -.02, -.025, .26, s * .03, -.01, .02, 5, s, .03, .01); });
+            } else {
+                // creamy golden fluffy teen-idol hair: soft fringe, volume on top, tousled tips
+                const side = style === 1 ? 1 : style === 2 ? -1 : 0;
+                add(SPH(.115), hm, head, .0, .2, -.02, 1.55, .85, 1.4).rotation.x = -.15;
+                // fluffy fringe in clumps
+                for (let k = 0; k < 11; k++) {
+                    const x = (k - 5) * .03, v = Math.abs(k - 5), sd = side * (k - 5) * .004 + side * .02;
+                    path([[x * .4, .27, .0 + v * .004], [x * .85 + sd, .23, -.12], [x * 1.05 + sd * 2, .13 - v * .008, -.205 + v * .006], [x * 1.18 + sd * 3 + (k < 5 ? -.012 : .012), .045 - v * .012, -.2 + v * .01]], .05 - v * .002, .011);
+                }
+                // fluffy secondary layer (adds volume and softness)
+                for (let k = 0; k < 7; k++) { const x = (k - 3) * .04; path([[x * .5, .28, .03], [x * .9, .27, -.06], [x * 1.1, .2, -.16]], .052, .014); }
+                // side curtains covering temples
+                [-1, 1].forEach(s => { path([[s * .12, .21, -.05], [s * .19, .09, -.07], [s * .205, -.03, -.03], [s * .195, -.1, .0]], .05, .012); path([[s * .1, .22, -.09], [s * .17, .12, -.12], [s * .19, .02, -.08]], .034, .01); });
+                // soft nape + tousled top tufts
+                for (let i = 0; i < 6; i++) lock(-.1 + i * .04, .0, .18, .15 + (i % 2) * .05, 0, .02, .02, 6, i * 1.5, .038, .012);
+                for (let i = 0; i < 6; i++) { const a = i * 1.05; path([[Math.sin(a) * .06, .27, Math.cos(a) * .05 - .03], [Math.sin(a) * .1, .33, Math.cos(a) * .08 - .03], [Math.sin(a) * .13 + .02, .335, Math.cos(a) * .1 - .02]], .02, .004); }
             }
-            [-1, 1].forEach(s => {
-                add(SPH(.04), M(skin), head, .18 * s, -.01, 0, .5, 1, .8);
-                if (F) add(SPH(.018), M(acc, { metalness: .45, roughness: .3 }), head, .19 * s, -.09, -.035);
-            });
-            add(SPH(.026), M(skin), head, 0, -.04, -.205, 1, 1.1, 1.2); add(CAP(.052, .1), M(skin), upper, 0, 1.5, 0);
-            const tm = M(shirtC, { roughness: .92, bumpMap: fabric, bumpScale: .8 });
-            add(new THREE.LatheGeometry([[.001, 0], [.15, 0], [.165, .12], [.185, .28], [.2, .42], [.18, .55], [.1, .62], [.001, .65]].map(([r, y]) => new THREE.Vector2(r, y)), 32), tm, upper, 0, .97, 0, F ? 1.15 : 1.3, 1, .78);
+            if (F) [-1, 1].forEach(s => add(SPH(.018), M(acc, { metalness: .6, roughness: .25 }), head, .19 * s, -.09, -.035));
+
+            /* ================= SCHOOL-UNIFORM BODY ================= */
+            add(CAP(.05, .1), M(skin), upper, 0, 1.5, 0);
+            const tm = M(shirtC, { roughness: .88, bumpMap: fabric, bumpScale: .5 }), om = M(navy, { roughness: .82, bumpMap: fabric, bumpScale: .9, side: THREE.DoubleSide });
+            const torso = [[.001, 0], [.15, 0], [.165, .12], [.185, .28], [.2, .42], [.18, .55], [.1, .62], [.001, .65]];
+            add(new THREE.LatheGeometry(torso.map(([r, y]) => new THREE.Vector2(r, y)), 32), tm, upper, 0, .97, 0, F ? 1.12 : 1.3, 1, .78);
+            add(new THREE.LatheGeometry(torso.map(([r, y]) => new THREE.Vector2(r + .014, y)), 32, Math.PI + .4, Math.PI * 2 - .8), om, upper, 0, .97, 0, F ? 1.12 : 1.3, 1, .78); // open blazer
             add(SPH(.18), M(pantC), upper, 0, .95, 0, 1.2, .7, .85);
+            add(new THREE.TorusGeometry(.105, .02, 7, 24), tm, upper, 0, 1.545, -.01).rotation.x = Math.PI / 2;       // shirt collar
             if (F) {
                 [-1, 1].forEach(s => add(SPH(.05), M(0xffffff), upper, .05 * s, 1.55, -.1, 1.4, .5, .8));
-                [1.1, 1.2, 1.3].forEach(y => add(SPH(.012), M(acc), upper, 0, y, -.148));
-                add(SPH(.014), M(0xc9a24a, { metalness: .9, roughness: .2 }), upper, 0, 1.46, -.14);
-                // Fine collar, small pendant and tailored front seam.
-                add(new THREE.TorusGeometry(.105, .018, 7, 24), M(0xf3e8df), upper, 0, 1.54, -.018).rotation.x = Math.PI / 2;
-                add(new THREE.OctahedronGeometry(.035, 0), M(acc, { metalness: .55, roughness: .25 }), upper, 0, 1.28, -.16);
-                add(RB(.012, .3, .012, .004), M(shirtC.clone().offsetHSL(0, 0, -.16)), upper, 0, 1.12, -.157);
+                const bw = new THREE.Group(); bw.position.set(0, 1.45, -.15); upper.add(bw);           // ribbon bow
+                add(new THREE.ConeGeometry(.045, .07, 10), M(acc), bw, -.045, 0, 0).rotation.z = Math.PI / 2; add(new THREE.ConeGeometry(.045, .07, 10), M(acc), bw, .045, 0, 0).rotation.z = -Math.PI / 2; add(SPH(.02), M(acc), bw, 0, 0, 0);
+                add(RB(.035, .14, .012, .004), M(acc), upper, -.012, 1.34, -.152).rotation.z = .06;
             } else {
-                add(new THREE.TorusGeometry(.125, .05, 10, 24), tm, upper, 0, 1.57, .03).rotation.x = Math.PI / 2;
-                [-1, 1].forEach(s => {
-                    add(CAP(.008, .12), M(0xeeeeee), upper, .04 * s, 1.45, -.15);
-                    add(RB(.045, .12, .025, .008), M(shirtC.clone().offsetHSL(0, 0, -.12)), upper, .18 * s, 1.2, -.09);
-                });
-                add(RB(.24, .1, .04, .02), M(shirtC.clone().offsetHSL(0, 0, -.05)), upper, 0, 1.1, -.14);
-                add(RB(.018, .32, .018, .005), M(acc), upper, 0, 1.18, -.16);
+                add(new THREE.TorusGeometry(.128, .03, 8, 24), om, upper, 0, 1.58, .035).rotation.x = Math.PI / 2;
+                add(RB(.045, .27, .014, .006), M(acc), upper, 0, 1.3, -.155);                           // necktie
+                add(new THREE.ConeGeometry(.03, .04, 8), M(acc), upper, 0, 1.45, -.15);
+                add(RB(.2, .045, .03, .012), M(0x3a2a1e, { roughness: .5 }), upper, 0, 1.0, -.15); add(RB(.04, .035, .015, .005), gold, upper, 0, 1.0, -.168);
             }
+            add(SPH(.026), gold, upper, F ? -.1 : -.11, 1.25, -.145, 1, 1, .5);                          // school emblem
             const hand = (p, s) => { add(RB(.075, .09, .03, .012), M(skin), p, 0, -.33, 0); for (let i = 0; i < 4; i++) add(CAP(.011, .05), M(skin), p, -.027 + i * .018, -.4, 0); add(CAP(.012, .04), M(skin), p, .05 * s, -.33, -.025).rotation.z = .6 * s; };
             const arm = s => {
-                const a = new THREE.Group(); a.position.set(.27 * s, 1.55, 0); a.rotation.z = .07 * s; upper.add(a); add(CAP(.05, .24), tm, a, 0, -.17, 0);
-                const fa = new THREE.Group(); fa.position.set(0, -.34, 0); a.add(fa); add(CAP(.043, .22), M(skin), fa, 0, -.14, 0); add(new THREE.TorusGeometry(.046, .014, 8, 18), tm, fa, 0, -.02, 0).rotation.x = Math.PI / 2; hand(fa, s); return { a, fa };
+                const a = new THREE.Group(); a.position.set(.27 * s, 1.55, 0); a.rotation.z = .07 * s; upper.add(a); add(CAP(.056, .24), om, a, 0, -.17, 0);
+                const fa = new THREE.Group(); fa.position.set(0, -.34, 0); a.add(fa); add(CAP(.045, .22), om, fa, 0, -.12, 0); add(new THREE.TorusGeometry(.048, .014, 8, 18), tm, fa, 0, -.2, 0).rotation.x = Math.PI / 2;
+                hand(fa, s); return { a, fa };
             };
             const aL = arm(-1), aR = arm(1);
             const leg = s => {
                 const l = new THREE.Group(); l.position.set(.1 * s, .88, 0); legs.add(l); add(CAP(.08, .3), F ? M(skin) : M(pantC), l, 0, -.23, 0);
-                const k = new THREE.Group(); k.position.y = -.44; l.add(k); add(CAP(.066, .3), F ? M(0xf4f4f4, { roughness: .9 }) : M(pantC), k, 0, -.22, 0);
-                if (!F) add(new THREE.TorusGeometry(.068, .016, 8, 18), M(pantC.clone().offsetHSL(0, 0, .08)), k, 0, -.4, 0).rotation.x = Math.PI / 2;
-                add(RB(.14, .09, .3, .04), F ? M(0x16161a, { roughness: .3 }) : M(0xf5f5f5, { roughness: .5 }), k, 0, -.4, -.05); add(RB(.145, .035, .31, .015), M(0x222222), k, 0, -.445, -.05);
-                if (F) add(RB(.12, .015, .04, .005), M(0xdddddd), k, 0, -.36, -.03); else add(RB(.15, .02, .1, .008), M(acc), k, 0, -.4, -.03);
+                const k = new THREE.Group(); k.position.y = -.44; l.add(k); add(CAP(.066, .3), F ? M(0xf8f8f8, { roughness: .9 }) : M(pantC), k, 0, -.22, 0);
+                if (F) add(new THREE.TorusGeometry(.068, .012, 8, 18), M(navy), k, 0, -.1, 0).rotation.x = Math.PI / 2;
+                else add(new THREE.TorusGeometry(.068, .016, 8, 18), M(pantC.clone().offsetHSL(0, 0, .08)), k, 0, -.4, 0).rotation.x = Math.PI / 2;
+                add(RB(.14, .09, .3, .04), F ? M(0x4a2c22, { roughness: .3 }) : M(0x2a2a2e, { roughness: .35 }), k, 0, -.4, -.05); add(RB(.145, .035, .31, .015), M(0x222222), k, 0, -.445, -.05);
                 return { l, k };
             };
             const legL = leg(-1), legR = leg(1);
-            if (F) add(new THREE.CylinderGeometry(.19, .34, .4, 64, 1, true), M(pantC, { side: THREE.DoubleSide, bumpMap: pleat, bumpScale: 2 }), legs, 0, .76, 0, 1, 1, .9);
+            if (F) add(new THREE.CylinderGeometry(.19, .34, .4, 64, 1, true), M(0xffffff, { map: plaid, side: THREE.DoubleSide, bumpMap: pleat, bumpScale: 2, roughness: .85 }), legs, 0, .76, 0, 1, 1, .9);
             g.add(legs, upper);
             const lc = document.createElement("canvas"); lc.width = 384; lc.height = 80;
             const lt = new THREE.CanvasTexture(lc);
