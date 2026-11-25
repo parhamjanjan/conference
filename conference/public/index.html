@@ -1266,9 +1266,11 @@
         import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
         import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
         import { Reflector } from "three/addons/objects/Reflector.js";
+        import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
         /* ================= CONFIG ================= */
-        const VIDEO = { width: 352, height: 288, fps: 8, maxBitrate: 150000 };
-        const SCREEN_BITRATE = 150000, SCREEN_FPS = 8;
+        const VIDEO = { width: 640, height: 480, fps: 12, maxBitrate: 450000 };
+        const SCREEN_BITRATE = 700000, SCREEN_FPS = 10;
+        const REQUIRED_WINS = 1; /* wins needed to enter the upper floor */
         const ROOM = "CSWFR", LOGIN_KEY = "focus_hall_login", STATS_KEY = "focus_hall_stats_", REMOTE_KEY = "focus_hall_remote_profiles";
         const $ = id => document.getElementById(id);
         let myGender = "m";
@@ -1343,28 +1345,28 @@
         const canvas = $("c3d");
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance", stencil: false, depth: true });
         // Keep GPU cost predictable on laptops and integrated graphics.
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.35));
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
         renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.08;
         // The scene uses layered materials, emissive details and rugs for depth; realtime
         // shadow maps were the largest recurring GPU cost, so they are intentionally off.
-        renderer.shadowMap.enabled = false;
+        renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         const ENV = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), .04).texture;
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x120d12); scene.fog = new THREE.Fog(0x120d12, 24, 55);
         const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 100); camera.rotation.order = "YXZ";
-        const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(2, 2, { type: THREE.UnsignedByteType, samples: 0, depthBuffer: true, stencilBuffer: false }));
-        composer.addPass(new RenderPass(scene, camera)); composer.addPass(new UnrealBloomPass(new THREE.Vector2(384, 384), .24, .55, .88)); composer.addPass(new OutputPass());
+        const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: 4, depthBuffer: true, stencilBuffer: false }));
+        composer.addPass(new RenderPass(scene, camera)); composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .3, .6, .86)); composer.addPass(new OutputPass());
         const hemi = new THREE.HemisphereLight(0xffe2bd, 0x2a1d33, 1.0); scene.add(hemi);
-        const moon = new THREE.DirectionalLight(0xb4c2ff, .6); moon.position.set(-6, 10, 8); moon.castShadow = false;
-        { const c = moon.shadow.camera; c.left = -15; c.right = 15; c.top = 15; c.bottom = -15; c.near = 1; c.far = 60; } moon.shadow.bias = -.0004; moon.shadow.normalBias = .03;
-        moon.target.position.set(0, 0, 3); scene.add(moon.target); scene.add(moon);
+        const moon = new THREE.DirectionalLight(0xc4cfff, .95); moon.position.set(-6, 10, 8); moon.castShadow = true;
+        { const c = moon.shadow.camera; c.left = -15; c.right = 15; c.top = 15; c.bottom = -15; c.near = 1; c.far = 60; } moon.shadow.bias = -.0004; moon.shadow.normalBias = .03; moon.shadow.mapSize.set(2048, 2048); moon.shadow.radius = 4;
+        moon.target.position.set(0, 0, 6); scene.add(moon.target); scene.add(moon);
 
         const envMats = []; const mat = (c, o = {}) => { const m = new THREE.MeshStandardMaterial({ color: c, roughness: .66, envMap: ENV, envMapIntensity: .45, ...o }); envMats.push(m); return m; };
-        function box(w, h, d, c, x, y, z, parent = scene) { const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(.03, Math.min(w, h, d) / 2.2)), mat(c)); m.position.set(x, y, z); parent.add(m); return m; }
-        function cyl(rt, rb, h, c, x, y, z, parent = scene, o = {}) { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 28), mat(c, o)); m.position.set(x, y, z); parent.add(m); return m; }
+        function box(w, h, d, c, x, y, z, parent = scene) { const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 4, Math.min(.03, Math.min(w, h, d) / 2.2)), mat(c)); m.position.set(x, y, z); parent.add(m); return m; }
+        function cyl(rt, rb, h, c, x, y, z, parent = scene, o = {}) { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 56), mat(c, o)); m.position.set(x, y, z); parent.add(m); return m; }
         function cu(w, h, d, c, x, y, z, p) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: c, roughness: .65 })); m.position.set(x, y, z); p.add(m); return m; }
         const cvs = (w, h, fn) => { const c = document.createElement("canvas"); c.width = w; c.height = h; fn(c.getContext("2d"), w, h); return c; };
-        const ctex = (c, rx = 1, ry = 1) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy()); return t; };
+        const ctex = (c, rx = 1, ry = 1) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy()); return t; };
         const BOUNDS = { x0: -11.2, x1: 11.2, z0: -7.55, z1: 12.2 };
         const solids = [], chairs = [];
         const solid = (x, z, r, lv = 0) => solids.push({ x, z, r, lv });
@@ -1383,18 +1385,18 @@
                 if (rn() < .18) { x.fillStyle = bump ? "rgba(0,0,0,.3)" : "rgba(40,20,10,.55)"; x.beginPath(); x.ellipse(X + 60 + rn() * 380, Y + 14 + rn() * 36, 7, 4, 0, 0, 7); x.fill(); }
             }
         });
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 21), new THREE.MeshPhysicalMaterial({ map: ctex(plankCv(false), 6, 5.25), bumpMap: ctex(plankCv(true), 6, 5.25), bumpScale: 1.6, roughness: .38, clearcoat: .55, clearcoatRoughness: .3, envMap: ENV, envMapIntensity: .5 }));
-        floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, 2.5); scene.add(floor);
+        const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 27), new THREE.MeshPhysicalMaterial({ map: ctex(plankCv(false), 6, 6.75), bumpMap: ctex(plankCv(true), 6, 6.75), bumpScale: 1.6, roughness: .38, clearcoat: .55, clearcoatRoughness: .3, envMap: ENV, envMapIntensity: .5 }));
+        floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, 5.5); scene.add(floor);
         // Low-cost brass inlays add definition to the ground plane without extra lighting passes.
         {
             const inlay = new THREE.MeshStandardMaterial({ color: 0xb98a4c, metalness: .72, roughness: .32, emissive: 0x241307, emissiveIntensity: .28 });
             const strips = [
-                [22.6, .028, .045, 0, .026, -7.35], [22.6, .028, .045, 0, .026, 12.35],
-                [.045, .028, 19.7, -11.25, .026, 2.5], [.045, .028, 19.7, 11.25, .026, 2.5]
+                [22.6, .028, .045, 0, .026, -7.35], [22.6, .028, .045, 0, .026, 18.35],
+                [.045, .028, 25.7, -11.25, .026, 5.5], [.045, .028, 25.7, 11.25, .026, 5.5]
             ];
             strips.forEach(([w, h, d, x, y, z]) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), inlay); m.position.set(x, y, z); scene.add(m); });
             const corner = new THREE.Mesh(new THREE.OctahedronGeometry(.16, 0), inlay);
-            [[-10.9, -7.05], [10.9, -7.05], [-10.9, 12.05], [10.9, 12.05]].forEach(([x, z]) => { const m = corner.clone(); m.position.set(x, .1, z); m.scale.set(1, .45, 1); scene.add(m); });
+            [[-10.9, -7.05], [10.9, -7.05], [-10.9, 18.05], [10.9, 18.05]].forEach(([x, z]) => { const m = corner.clone(); m.position.set(x, .1, z); m.scale.set(1, .45, 1); scene.add(m); });
         }
         const WALL = 0x35273b, WOOD = 0x4a2f1d;
         const damaskCv = (hu, sa, l) => cvs(512, 512, c => {
@@ -1407,8 +1409,8 @@
             const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: ctex(cv, w / 1.6, h / 1.6), bumpMap: ctex(cv, w / 1.6, h / 1.6), bumpScale: 1.2, roughness: .85 }));
             m.position.set(x, y, z); m.rotation.y = ry; m.userData.ns = 1; scene.add(m); return m;
         }
-        { const d = damaskCv(300, 28, 24); wallPlane(24, 4.6, 0, 2.3, -7.84, 0, d); wallPlane(24, 4.6, 0, 2.3, 12.84, Math.PI, d); wallPlane(21, 4.6, -11.84, 2.3, 2.5, Math.PI / 2, d); wallPlane(21, 4.6, 11.84, 2.3, 2.5, -Math.PI / 2, d); }
-        box(24, 4.6, .3, WALL, 0, 2.3, -8); box(24, 4.6, .3, WALL, 0, 2.3, 13); box(.3, 4.6, 21, WALL, -12, 2.3, 2.5); box(.3, 4.6, 21, WALL, 12, 2.3, 2.5);
+        { const d = damaskCv(300, 28, 24); wallPlane(24, 4.6, 0, 2.3, -7.84, 0, d); wallPlane(24, 4.6, 0, 2.3, 18.84, Math.PI, d); wallPlane(27, 4.6, -11.84, 2.3, 5.5, Math.PI / 2, d); wallPlane(27, 4.6, 11.84, 2.3, 5.5, -Math.PI / 2, d); }
+        box(24, 4.6, .3, WALL, 0, 2.3, -8); box(24, 4.6, .3, WALL, 0, 2.3, 19); box(.3, 4.6, 27, WALL, -12, 2.3, 5.5); box(.3, 4.6, 27, WALL, 12, 2.3, 5.5);
         let upK = 0, gl = null, ul = [], upAud = null, doorOpen = false, ghost = null, ghostT = 4, ghostLife = 0, offUntil = 0, fin_ = false, stage = 0, keyLed = null, gate = null, crown = null, boardCv = null, boardTex = null, champT = 0, isChamp = false, lastEk = -1, portals = [], piano = null, dolls = [], tvTex = null, tvT = 0, tpCool = 0, seq = [], statue = null, eyeM = null, doorMesh = null, orb = null, strangeProps = [], stairDoors = [];
         const UY = 4.7, ORDER = [0, 2, 3, 1], pupils = [], candles = [], hang = [], books = [], gems = [], peds = [], C1 = new THREE.Color(0x120d12), C2 = new THREE.Color(0x040806), _v = new THREE.Vector3();
         const ST = { R: 3.4, hw: .85, T: Math.PI / 2, N: 22, cz: -3.2, cx: 7.2 };
@@ -1492,15 +1494,15 @@
                     c.textAlign = 'center'; c.fillStyle = '#f2d18a'; c.font = 'bold 48px Georgia';
                     c.fillText('THE UPPER FLOOR IS SEALED', w / 2, 72);
                     c.fillStyle = '#fff0cf'; c.font = 'bold 36px Arial';
-                    c.fillText('ONLY PLAYERS WITH 1 SNAKES & LADDERS WINS MAY ENTER', w / 2, 142);
-                    c.fillStyle = '#b98cff'; c.font = 'italic 27px Georgia'; c.fillText('THREE VICTORIES. THEN THE DOOR REMEMBERS YOU.', w / 2, 202);
+                    c.fillText('ONLY PLAYERS WHO WON SNAKES & LADDERS ONCE MAY ENTER', w / 2, 142);
+                    c.fillStyle = '#b98cff'; c.font = 'italic 27px Georgia'; c.fillText('ONE VICTORY. THEN THE DOOR REMEMBERS YOU.', w / 2, 202);
                 });
                 P(2.55, .72, label, dx, 3.12, dz + .255, 0);
                 const sigil = new THREE.Mesh(new THREE.TorusGeometry(.25, .035, 8, 28), glow);
                 sigil.position.set(dx, 3.68, dz + .29); scene.add(sigil);
                 stairDoors.push({ x: dx, z: dz, leaves, open: false, openAmount: 0 });
             });
-            wr("I SLEEP WHILE THE SUN IS AWAKE.|I AM THE SMALLEST LAMP OF THE DREAMER.|I SEE EVERYTHING AND AM NEVER SEEN.|I COME LAST — AND I AM WHY IT ALL BEGAN.", 0, Y + 3.2, 12.78, Math.PI, 8);
+            wr("I SLEEP WHILE THE SUN IS AWAKE.|I AM THE SMALLEST LAMP OF THE DREAMER.|MY BORDERS HAVE BEEN DRAWN BY HUMAN BEINGS.|I AM THE SOURCE OF THE LIGHT.", 0, Y + 3.2, 12.78, Math.PI, 8);
             wr("ONE OF YOU|IS NOT STUDYING", -11.78, Y + 3.7, 6, Math.PI / 2); wr("WHEN YOU LOOK AWAY|IT COMES CLOSER", 11.78, Y + 3.7, 9, -Math.PI / 2); wr("DON'T LOOK BEHIND YOU", 0, Y + 3.9, -7.78, 0, 5);
             P(5, 5, cvs(512, 512, x => {
                 x.translate(256, 256); x.strokeStyle = "#8a1020"; x.lineWidth = 6;[240, 200].forEach(r => { x.beginPath(); x.arc(0, 0, r, 0, 7); x.stroke(); });
@@ -1625,7 +1627,7 @@
                     const bg = c.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, "#2b1055"); bg.addColorStop(1, "#0a0420"); c.fillStyle = bg; c.fillRect(0, 0, w, h); c.strokeStyle = "#ffd54a"; c.lineWidth = 3;[100, 70, 40].forEach(r => { c.beginPath(); c.arc(128, 170, r, 0, 7); c.stroke(); });
                     c.fillStyle = "#ffd54a"; c.font = "16px serif"; c.textAlign = "center"; for (let i = 0; i < 16; i++) { c.save(); c.translate(128, 170); c.rotate(i * Math.PI / 8); c.fillText("ᚠᚢᚦᚨᚱᚲᛉᛊ"[i % 8], 0, -86); c.restore(); }
                     c.fillStyle = "#f6f0e0"; c.beginPath(); c.ellipse(128, 170, 55, 28, 0, 0, 7); c.fill(); c.fillStyle = "#7b3cff"; c.beginPath(); c.arc(128, 170, 22, 0, 7); c.fill(); c.fillStyle = "#000"; c.beginPath(); c.ellipse(128, 170, 6, 18, 0, 0, 7); c.fill();
-                    c.fillStyle = "#ffd54a"; c.font = "bold 24px serif"; c.fillText("★ ★ ★", 128, 300); c.font = "12px serif"; c.fillText("ONLY THREE-TIME CHAMPIONS", 128, 332); c.fillText("MAY PASS", 128, 350);
+                    c.fillStyle = "#ffd54a"; c.font = "bold 24px serif"; c.fillText("★ ★ ★", 128, 300); c.font = "12px serif"; c.fillText("ONLY CHAMPIONS", 128, 332); c.fillText("MAY PASS", 128, 350);
                 });
                 // Three-win entrance: placed directly across the upper-floor arrival hall.
                 const GX = 0, GZ = -7.62;
@@ -1640,7 +1642,7 @@
                     e.position.set(GX + Math.cos(a) * 1.9, Y + 3.95 + Math.sin(a) * 1.9, GZ + .06); scene.add(e);
                     const pu = new THREE.Mesh(new THREE.SphereGeometry(.022, 8, 8), new THREE.MeshBasicMaterial({ color: 0x12070b })); e.add(pu); pupils.push([e, pu]);
                 }
-                wr("THREE VICTORIES · ONE THRESHOLD", 0, Y + 4.35, -7.78, 0, 5.2);
+                wr("ONE VICTORY · ONE THRESHOLD", 0, Y + 4.35, -7.78, 0, 5.2);
                 box(.12, .5, .35, 0x151515, 11.72, Y + 1.4, 5.5); keyLed = new THREE.Mesh(new THREE.SphereGeometry(.04, 12, 10), new THREE.MeshBasicMaterial({ color: 0xff2a3a })); keyLed.position.set(11.64, Y + 1.58, 5.5); scene.add(keyLed);
                 wr("COUNT WHAT WATCHES YOU:|THE FRAMES · THE DOLLS|THE FLAMES ON THE FLOOR|THE CHAIRS THAT HANG", 11.78, Y + 3.3, -5.4, -Math.PI / 2, 3.8);
             }
@@ -1713,9 +1715,16 @@
             if (py < 4) return;
             if (level === 2) { if (Math.hypot(px + 13.1, pz - 3) < 2.5) { flash(); setTimeout(() => { level = 1; px = 0; pz = -5.65; yaw = 0; }, 500); } return; }
             if (Math.hypot(px, pz + 6.15) < 2.35) {
-                if (isChamp) { drawBoard(); flash(); zap(); setTimeout(() => { level = 2; px = -14.6; pz = 3; yaw = Math.PI / 2; setStatus("Welcome, Champion. 👑"); }, 500); }
-                else { punish(); setStatus("The gate's eye narrows. Only one-time champions may pass.", true); } return;
-            }
+    if (!isChamp) {
+        punish(); setStatus("The gate's eye narrows. Only champions may pass.", true);
+    } else if (!doorOpen) {
+        punish(); setStatus("The gate stays shut… solve the mystery first.", true);
+    } else {
+        drawBoard(); flash(); zap();
+        setTimeout(() => { level = 2; px = -14.6; pz = 3; yaw = Math.PI / 2; setStatus("Welcome, Champion. 👑"); }, 500);
+    }
+    return;
+}
             if (Math.hypot(px - 11.7, pz - 5.5) < 2) {
                 if (stage < 1) { setStatus("The keypad is dead…", true); return; } if (doorOpen) return;
                 document.exitPointerLock?.(); const v = prompt("🔒 Enter the 4-digit code"); if (v === null) return;
@@ -1727,46 +1736,30 @@
             else if (seq.length === 4) { stage = 1; keyLed.material.color.setHex(0x22ff66); zap(); setStatus("The runes sigh… a lock somewhere wakes up."); }
             else setStatus(`The rune hums… ${seq.length}/4`);
         }
-        function fin() { fin_ = true; scene.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } }); }
+        function fin() { fin_ = true; scene.traverse(o => { if (o.isMesh) o.receiveShadow = (o === floor) || (o.material === rugMat); }); }
         function upTick(now, dt) {
             if (!fin_) fin();
             const si = mySeat < 0 ? stairInfo(px, pz) : null;
-            const hasThreeWins = computeState(ownStats.rolls).wins >= 1;
+            const hasThreeWins = computeState(ownStats.rolls).wins >= REQUIRED_WINS;
             if (si && level !== 2 && hasThreeWins) { if (si.th < .25) level = 0; else if (si.th > ST.T - .1) level = 1; }
             const T = si ? stepTop(Math.max(0, si.th)) : level === 2 ? UY : level * UY; py += (T - py) * Math.min(1, dt * 12);
             upK = Math.min(1, Math.max(0, (py - 1.5) / 2.5));
             if (!gl) { gl = []; scene.traverse(o => { if (o.isPointLight && !o.userData.up) { o.userData.i0 = o.intensity; gl.push(o); } }); }
-            gl.forEach(l => l.intensity = l.userData.i0 * (1 - .92 * upK)); moon.intensity = .6 * (1 - .85 * upK);
+            gl.forEach(l => l.intensity = l.userData.i0 * (1 - .92 * upK)); moon.intensity = .95 * (1 - .85 * upK);
             const t = now / 1000, off = performance.now() < offUntil, fl = off ? 0 : (Math.sin(t * 23) * Math.sin(t * 7.3) > .55 ? .15 : 1);
-            fire.forEach((f, i) => {
-                f.scale.set(1 + Math.sin(t * (7.5 + i * .17) + i) * .18,
-                    .82 + Math.sin(t * (10.5 + i * .13) + i * 2) * .24, 1);
-                f.rotation.z = Math.sin(t * 4.2 + i * 1.7) * .075 + (i - 4) * .035;
-                f.position.x = (i - 4) * .19 + Math.sin(t * 3.1 + i) * .035;
-                f.material.opacity = (.62 + .28 * Math.sin(t * 8 + i * 2)) * (1 - .92 * upK);
-            });
-            const ep = emberGeo.attributes.position;
-            for (let i = 0; i < emberCount; i++) {
-                let y = ep.getY(i) + emberVel[i] * .018;
-                let x = ep.getX(i) + Math.sin(t * 2.2 + i) * .002;
-                if (y > 2.05 || Math.random() < .002) { y = .32 + Math.random() * .35; x = (Math.random() - .5) * 1.35; }
-                ep.setXYZ(i, x, y, -7.0 + Math.sin(t + i) * .025);
-            }
-            ep.needsUpdate = true; embers.material.opacity = .9 * (1 - .92 * upK);
-            smoke.forEach((s, i) => {
-                s.mesh.position.y = 1.08 + ((t * s.speed + s.phase) % 1.35);
-                s.mesh.position.x = Math.sin(t * .55 + s.phase) * (.12 + i * .025);
-                s.mesh.scale.setScalar(.7 + ((t * s.speed + s.phase) % 1.35) * .65);
-                s.mesh.material.opacity = .07 * (1 - .92 * upK);
-            });
-            fireGlow.material.opacity = (.11 + .055 * Math.sin(t * 10) * Math.sin(t * 6)) * (1 - .92 * upK);
-            fireGlow.scale.set(1 + Math.sin(t * 5) * .07, 1 + Math.sin(t * 8) * .08, 1);
-            fireL.intensity = fireL.userData.i0 * (1 - .92 * upK) * (.78 + .22 * Math.sin(t * 11) * Math.sin(t * 7));
-            if (now - champT > 250) { champT = now; isChamp = computeState(ownStats.rolls).wins >= 1; }
+            fireTick(t, dt); fireL.intensity = fireL.userData.i0 * (1 - .92 * upK) * fireFlick; fireL.position.x = Math.sin(t * 5.3) * .08;
+            if (now - champT > 250) { champT = now; isChamp = computeState(ownStats.rolls).wins >= REQUIRED_WINS; }
             { const ek = .45 * (1 - .9 * upK); if (Math.abs(ek - lastEk) > .005) { lastEk = ek; envMats.forEach(m => m.envMapIntensity = ek); } }
             ul.forEach((l, i) => l.intensity = l.userData.i0 * upK * (i === 2 ? fl : (off ? 0 : 1 + Math.sin(t * 9 + i) * .12)));
             hemi.intensity = 1.15 - upK; scene.fog.near = 24 - 21 * upK; scene.fog.far = 55 - 30 * upK; scene.fog.color.copy(C1).lerp(C2, upK); scene.background.copy(scene.fog.color);
             if (upK > .05) { const a = upAudio(); if (a) { if (a.c.state === "suspended") a.c.resume().catch(() => { }); a.m.gain.setTargetAtTime(.05 * upK, a.c.currentTime, .3); } } else if (upAud) upAud.m.gain.setTargetAtTime(0, upAud.c.currentTime, .3);
+                stairDoors.forEach(d => {
+                const target = isChamp ? 4.65 : 0;
+                d.leaves.forEach(leaf => { leaf.position.y += (target - leaf.position.y) * Math.min(1, dt * 3.2); });
+                d.openAmount = Math.min(...d.leaves.map(leaf => leaf.position.y));
+                d.open = d.openAmount > 3.55;
+            });
+
             if (upK < .05) { ghost.material.opacity = 0; return; }
             orb.position.y = UY + 1.7 + Math.sin(t * 1.5) * .15; orb.rotation.set(t, t * .7, 0); eyeM.lookAt(camera.position);
             strangeProps.forEach((p, i) => { p.g.rotation.y = t * p.speed + p.phase; p.g.rotation.x = Math.sin(t * .42 + p.phase) * .18; p.g.position.y = p.baseY + Math.sin(t * .9 + p.phase) * .16; });
@@ -1779,12 +1772,6 @@
                 statue.rotation.y = Math.atan2(-dx, -dz); if (py > 4 && level !== 2 && dot < .55 && d > 2.2 && !off) { statue.position.x -= dx / d * dt * .9; statue.position.z -= dz / d * dt * .9; }
             }
             if (gate) gate.material.color.setRGB(isChamp ? 1.3 : .7 + .3 * Math.sin(t * 2), isChamp ? 1.1 : .7 + .3 * Math.sin(t * 2), isChamp ? .6 : 1); if (crown) { crown.rotation.y = t * .8; crown.position.y = UY + 2.6 + Math.sin(t * 1.4) * .12; }
-            stairDoors.forEach(d => {
-                const target = isChamp ? 4.65 : 0;
-                d.leaves.forEach(leaf => { leaf.position.y += (target - leaf.position.y) * Math.min(1, dt * 3.2); });
-                d.openAmount = Math.min(...d.leaves.map(leaf => leaf.position.y));
-                d.open = d.openAmount > 3.55;
-            });
             dolls.forEach(d => d.lookAt(camera.position));
             portals.forEach(p => p.ds.forEach((d, k) => d.rotation.z = t * (k ? -1.4 : 1.1)));
             tpCool -= dt; if (tpCool <= 0 && py > 4 && mySeat < 0) portals.forEach((p, i) => { if (Math.hypot(px - p.x, pz - p.z) < .6) { const o = portals[1 - i]; px = o.x; pz = o.z + 1.1; tpCool = 2.5; zap(); setStatus("The world folds… 🌀"); } });
@@ -1802,19 +1789,19 @@
             if ((py > 4 || stairDoors.some(d => Math.abs(px - d.x) < 2.25 && Math.abs(pz - d.z) < 2.0)) && mySeat < 0) {
                 const dG = Math.hypot(px, pz + 6.15), dK = Math.hypot(px - 11.7, pz - 5.5);
                 $("hint").textContent = level === 2 ? (Math.hypot(px + 13.1, pz - 3) < 2.5 ? "Press F to leave the Hall of Champions" : "The Hall of Champions · WASD to explore")
-                    : stairDoors.some(d => Math.abs(px - d.x) < 2.25 && Math.abs(pz - d.z) < 2.0) && !isChamp ? "SEALED: win Snakes & Ladders at least 3 times to enter the upper floor"
-                        : stairDoors.some(d => Math.abs(px - d.x) < 2.25 && Math.abs(pz - d.z) < 2.0) && isChamp ? "The three-victory gates are opening"
-                            : py > 4 && dG < 2.4 ? (isChamp ? "Press F to enter the Champion's Gate" : "Champion's Gate — requires 3 Snakes & Ladders wins")
+                    : stairDoors.some(d => Math.abs(px - d.x) < 2.25 && Math.abs(pz - d.z) < 2.0) && !isChamp ? "SEALED: win Snakes & Ladders once to enter the upper floor"
+                        : stairDoors.some(d => Math.abs(px - d.x) < 2.25 && Math.abs(pz - d.z) < 2.0) && isChamp ? "The victory gates are opening"
+                            : py > 4 && dG < 2.4 ? (isChamp ? "Press F to enter the Champion's Gate" : "Champion's Gate — requires 1 Snakes & Ladders win")
                                 : py > 4 && dK < 2 ? (stage < 1 ? "The keypad is dead… something else must wake it first" : doorOpen ? "Unlocked" : "Press F to enter the 4-digit code")
                                     : nearPed() >= 0 && stage < 1 ? "Press F to touch the rune" : "WASD to move · find the clues · don't let it out of your sight…";
             }
         }
         buildUpstairs();
-        [-6, -2, 2, 6, 10].forEach(z => box(23.6, .28, .3, 0x3b2618, 0, 4.45, z));
+        [-6, -2, 2, 6, 10, 14, 18].forEach(z => box(23.6, .28, .3, 0x3b2618, 0, 4.45, z));
         box(23.6, 1.1, .08, WOOD, 0, .55, -7.82); box(23.6, .08, .12, 0x6b4630, 0, 1.12, -7.8);
-        box(.08, 1.1, 21, WOOD, -11.82, .55, 2.5); box(.08, 1.1, 21, WOOD, 11.82, .55, 2.5); box(23.6, 1.1, .08, WOOD, 0, .55, 12.82);
-        box(.12, .08, 21, 0x6b4630, -11.8, 1.12, 2.5); box(.12, .08, 21, 0x6b4630, 11.8, 1.12, 2.5); box(23.6, .08, .12, 0x6b4630, 0, 1.12, 12.8);
-        box(23.6, .22, .22, 0x6b4630, 0, 4.48, -7.75); box(23.6, .22, .22, 0x6b4630, 0, 4.48, 12.75); box(.22, .22, 21, 0x6b4630, -11.75, 4.48, 2.5); box(.22, .22, 21, 0x6b4630, 11.75, 4.48, 2.5);
+        box(.08, 1.1, 27, WOOD, -11.82, .55, 5.5); box(.08, 1.1, 27, WOOD, 11.82, .55, 5.5); box(23.6, 1.1, .08, WOOD, 0, .55, 18.82);
+        box(.12, .08, 27, 0x6b4630, -11.8, 1.12, 5.5); box(.12, .08, 27, 0x6b4630, 11.8, 1.12, 5.5); box(23.6, .08, .12, 0x6b4630, 0, 1.12, 18.8);
+        box(23.6, .22, .22, 0x6b4630, 0, 4.48, -7.75); box(23.6, .22, .22, 0x6b4630, 0, 4.48, 18.75); box(.22, .22, 27, 0x6b4630, -11.75, 4.48, 5.5); box(.22, .22, 27, 0x6b4630, 11.75, 4.48, 5.5);
 
         /* front wall: sign, clock, windows, paintings */
         {
@@ -1853,246 +1840,152 @@
             });
         }
 
-        /* bookshelves: every single book gets a complete, readable English title */
-        const bookMesh = new THREE.InstancedMesh(
-            new THREE.BoxGeometry(1, 1, 1),
-            new THREE.MeshStandardMaterial({ roughness: .7 }),
-            5200
-        );
-        let bookN = 0;
-        scene.add(bookMesh);
-
-        const BCOL = [
-            0x8b2e2e, 0x2e5a8b, 0x2e7a4a, 0xc9a23a, 0x5a3a7a,
-            0x7a4a2e, 0xb85c38, 0x2f6f6f, 0xd9cdb4, 0x3a3a52,
-            0x9a3b6a, 0x315b58, 0x8a6b35, 0x57465f
-        ];
-
-        /* A large title library: titles repeat only after the full list is used. */
-        const BOOK_TITLES = [
-            "THE GREAT GATSBY", "ATOMIC HABITS", "THE HOBBIT", "THE ART OF WAR",
-            "PRIDE AND PREJUDICE", "MOBY DICK", "DUNE", "THE ALCHEMIST",
-            "THE ADVENTURES OF SHERLOCK HOLMES", "THE ODYSSEY", "NINETEEN EIGHTY-FOUR",
-            "LITTLE WOMEN", "THE SECRET GARDEN", "DRACULA", "JANE EYRE",
-            "THE ILIAD", "THE CATCHER IN THE RYE", "TO KILL A MOCKINGBIRD",
-            "THE PICTURE OF DORIAN GRAY", "CRIME AND PUNISHMENT",
-            "THE BROTHERS KARAMAZOV", "WAR AND PEACE", "ANNA KARENINA",
-            "THE COUNT OF MONTE CRISTO", "LES MISERABLES", "THE THREE MUSKETEERS",
-            "A TALE OF TWO CITIES", "GREAT EXPECTATIONS", "OLIVER TWIST",
-            "WUTHERING HEIGHTS", "THE OLD MAN AND THE SEA", "FAHRENHEIT 451",
-            "BRAVE NEW WORLD", "THE LORD OF THE RINGS", "THE FELLOWSHIP OF THE RING",
-            "THE TWO TOWERS", "THE RETURN OF THE KING", "THE SILMARILLION",
-            "THE NAME OF THE WIND", "A WIZARD OF EARTHSEA", "THE LION THE WITCH AND THE WARDROBE",
-            "THE VOYAGE OF THE DAWN TREADER", "CHARLOTTE'S WEB", "BLACK BEAUTY",
-            "TREASURE ISLAND", "ROBINSON CRUSOE", "GULLIVER'S TRAVELS",
-            "THE CALL OF THE WILD", "WHITE FANG", "THE JUNGLE BOOK",
-            "ALICE'S ADVENTURES IN WONDERLAND", "THROUGH THE LOOKING-GLASS",
-            "PETER PAN", "THE WONDERFUL WIZARD OF OZ", "PINOCCHIO",
-            "THE LITTLE PRINCE", "THE WIND IN THE WILLOWS", "ANIMAL FARM",
-            "LORD OF THE FLIES", "THE GRAPES OF WRATH", "EAST OF EDEN",
-            "OF MICE AND MEN", "THE SOUND AND THE FURY", "BELOVED",
-            "THE COLOR PURPLE", "THE KITE RUNNER", "A THOUSAND SPLENDID SUNS",
-            "LIFE OF PI", "THE BOOK THIEF", "THE SHADOW OF THE WIND",
-            "THE NIGHT CIRCUS", "THE MIDNIGHT LIBRARY", "THE BOOK OF LOST THINGS",
-            "THE SILENT PATIENT", "GONE GIRL", "THE GIRL WITH THE DRAGON TATTOO",
-            "MURDER ON THE ORIENT EXPRESS", "AND THEN THERE WERE NONE",
-            "THE HOUND OF THE BASKERVILLES", "THE SIGN OF FOUR",
-            "THE COMPLETE POEMS", "SELECTED SHORT STORIES", "A BRIEF HISTORY OF TIME",
-            "COSMOS", "THE SELFISH GENE", "SAPIENS", "HOMO DEUS",
-            "THINKING FAST AND SLOW", "THE POWER OF HABIT", "DEEP WORK",
-            "THE 7 HABITS OF HIGHLY EFFECTIVE PEOPLE", "MAN'S SEARCH FOR MEANING",
-            "MEDITATIONS", "THE REPUBLIC", "THE PRINCE", "ON THE ORIGIN OF SPECIES",
-            "THE WEALTH OF NATIONS", "THE WORLD AS WILL AND REPRESENTATION",
-            "THE COMPLETE WORKS OF SHAKESPEARE", "HAMLET", "MACBETH",
-            "ROMEO AND JULIET", "A MIDSUMMER NIGHT'S DREAM", "THE DIVINE COMEDY",
-            "PARADISE LOST", "THE ODYSSEY: A NEW TRANSLATION", "THE METAMORPHOSIS",
-            "THE TRIAL", "THE STRANGER", "NOTES FROM UNDERGROUND",
-            "THE PLAGUE", "ONE HUNDRED YEARS OF SOLITUDE", "LOVE IN THE TIME OF CHOLERA",
-            "THE HOUSE OF THE SPIRITS", "MIDNIGHT'S CHILDREN", "THE GOD OF SMALL THINGS",
-            "THE REMAINS OF THE DAY", "NEVER LET ME GO", "Atonement",
-            "THE HANDMAID'S TALE", "THE TESTAMENTS", "THE ROAD",
-            "NO COUNTRY FOR OLD MEN", "BLOOD MERIDIAN", "THE MARTIAN",
-            "PROJECT HAIL MARY", "ENDer's GAME", "FOUNDATION",
-            "I, ROBOT", "DO ANDROIDS DREAM OF ELECTRIC SHEEP",
-            "THE LEFT HAND OF DARKNESS", "CHILDHOOD'S END", "NEUROMANCER",
-            "SNOW CRASH", "READY PLAYER ONE", "THE THREE-BODY PROBLEM",
-            "THE DARK FOREST", "DEATH'S END", "JURASSIC PARK",
-            "THE LOST WORLD", "THE TIME MACHINE", "THE WAR OF THE WORLDS",
-            "TWENTY THOUSAND LEAGUES UNDER THE SEA", "FROM THE EARTH TO THE MOON",
-            "THE INVISIBLE MAN", "STRANGE CASE OF DR JEKYLL AND MR HYDE",
-            "THE TURN OF THE SCREW", "FRANKENSTEIN", "THE HAUNTING OF HILL HOUSE",
-            "THE SHINING", "IT", "PET SEMATARY", "THE STAND",
-            "THE NAME OF THE ROSE", "THE TALENTED MR RIPLEY", "REBECCA",
-            "THE THIRTY-NINE STEPS", "THE BIG SLEEP", "THE MALTESE FALCON",
-            "THE MURDER OF ROGER ACKROYD", "THE MOONSTONE", "THE WOMAN IN WHITE",
-            "THE COMPLETE STORIES", "A ROOM WITH A VIEW", "HOWARDS END",
-            "MIDDLEmarch", "NORTH AND SOUTH", "THE AGE OF INNOCENCE",
-            "THE HOUSE OF MIRTH", "THE AWAKENING", "THE BELL JAR",
-            "THEIR EYES WERE WATCHING GOD", "THE SUN ALSO RISES",
-            "FOR WHOM THE BELL TOLLS", "A FAREWELL TO ARMS", "THE GREAT EXPECTATIONS",
-            "THE COMPLETE NOVELS", "THE ART OF READING", "THE HISTORY OF TOMORROW"
-        ];
-
-        /* Build one texture and one instanced label batch per title. This keeps
-           thousands of labels crisp without creating thousands of separate meshes. */
-        const titleIndexByName = new Map();
-        const titlePlacements = BOOK_TITLES.map(() => []);
-        const titleTextures = BOOK_TITLES.map((title, index) => {
-            const cv = document.createElement("canvas");
-            cv.width = 256;
-            cv.height = 1024;
-            const ctx = cv.getContext("2d");
-            ctx.clearRect(0, 0, cv.width, cv.height);
-
-            /* Gold spine ornaments and a subtle dark translucent backing. */
-            ctx.fillStyle = "rgba(18, 13, 10, 0.34)";
-            ctx.fillRect(14, 12, 228, 1000);
-            ctx.strokeStyle = "rgba(230, 197, 125, 0.96)";
-            ctx.lineWidth = 8;
-            ctx.strokeRect(19, 18, 218, 988);
-            ctx.strokeStyle = "rgba(230, 197, 125, 0.56)";
-            ctx.lineWidth = 3;
-            ctx.strokeRect(31, 31, 194, 962);
-
-            /* Rotate the full title so it reads vertically along the spine. */
-            ctx.save();
-            ctx.translate(128, 512);
-            ctx.rotate(-Math.PI / 2);
-            ctx.fillStyle = "#fff0c7";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.shadowColor = "rgba(0,0,0,.95)";
-            ctx.shadowBlur = 5;
-            ctx.font = "bold 29px Georgia, 'Times New Roman', serif";
-            let fontSize = 29;
-            const maxTextWidth = 900;
-            while (ctx.measureText(title).width > maxTextWidth && fontSize > 15) {
-                fontSize -= 1;
-                ctx.font = `bold ${fontSize}px Georgia, 'Times New Roman', serif`;
+        /* bookshelves (instanced books) */
+        /* ---- readable book spines: 128 unique designs (title, author, ornaments) in one atlas ---- */
+const BOOK_TITLES = [
+    ["Moby-Dick", "H. MELVILLE"], ["Pride & Prejudice", "J. AUSTEN"], ["Great Expectations", "C. DICKENS"], ["Jane Eyre", "C. BRONTË"], ["War and Peace", "L. TOLSTOY"],
+    ["The Odyssey", "HOMER"], ["Les Misérables", "V. HUGO"], ["Don Quixote", "CERVANTES"], ["Frankenstein", "M. SHELLEY"], ["Hamlet", "W. SHAKESPEARE"],
+    ["Origin of Species", "C. DARWIN"], ["Principia", "I. NEWTON"], ["The Republic", "PLATO"], ["Meditations", "M. AURELIUS"], ["Leviathan", "T. HOBBES"],
+    ["Calculus", "J. STEWART"], ["Linear Algebra", "G. STRANG"], ["Organic Chemistry", "L. WADE"], ["Molecular Biology", "B. ALBERTS"], ["Physics I", "R. FEYNMAN"],
+    ["Thermodynamics", "H. CALLEN"], ["Anatomy", "H. GRAY"], ["Statistics", "D. FREEDMAN"], ["Algorithms", "T. CORMEN"], ["Discrete Math", "K. ROSEN"],
+    ["World History", "E. H. GOMBRICH"], ["Economics", "P. SAMUELSON"], ["Psychology", "W. JAMES"], ["Philosophy", "B. RUSSELL"], ["Astronomy", "C. SAGAN"],
+    ["Geometry", "EUCLID"], ["Poetics", "ARISTOTLE"], ["Candide", "VOLTAIRE"], ["Dracula", "B. STOKER"], ["Ulysses", "J. JOYCE"],
+    ["Dubliners", "J. JOYCE"], ["Emma", "J. AUSTEN"], ["Walden", "H. THOREAU"], ["Faust", "J. W. GOETHE"], ["The Iliad", "HOMER"],
+    ["Atlas", "WORLD MAPS"], ["Dictionary", "OXFORD"], ["Encyclopedia", "VOL. IV"], ["Logic", "J. S. MILL"], ["Ethics", "SPINOZA"],
+    ["Optics", "I. NEWTON"], ["Elements", "EUCLID"], ["Chemistry", "L. PAULING"], ["Genetics", "G. MENDEL"], ["Botany", "C. LINNAEUS"],
+    ["Geology", "C. LYELL"], ["Biology", "N. CAMPBELL"], ["Neuroscience", "E. KANDEL"], ["Sociology", "M. WEBER"], ["Poems", "R. FROST"],
+    ["Anna Karenina", "L. TOLSTOY"], ["Crime and Punishment", "F. DOSTOEVSKY"], ["The Brothers Karamazov", "F. DOSTOEVSKY"], ["Madame Bovary", "G. FLAUBERT"], ["The Count of Monte Cristo", "A. DUMAS"],
+    ["The Three Musketeers", "A. DUMAS"], ["Wuthering Heights", "E. BRONTË"], ["Middlemarch", "G. ELIOT"], ["Oliver Twist", "C. DICKENS"], ["A Tale of Two Cities", "C. DICKENS"],
+    ["David Copperfield", "C. DICKENS"], ["Sense and Sensibility", "J. AUSTEN"], ["Northanger Abbey", "J. AUSTEN"], ["Persuasion", "J. AUSTEN"], ["Mansfield Park", "J. AUSTEN"],
+    ["The Great Gatsby", "F. S. FITZGERALD"], ["To Kill a Mockingbird", "H. LEE"], ["1984", "G. ORWELL"], ["Animal Farm", "G. ORWELL"], ["Brave New World", "A. HUXLEY"],
+    ["Fahrenheit 451", "R. BRADBURY"], ["The Lord of the Flies", "W. GOLDING"], ["The Catcher in the Rye", "J. D. SALINGER"], ["The Old Man and the Sea", "E. HEMINGWAY"], ["A Farewell to Arms", "E. HEMINGWAY"],
+    ["For Whom the Bell Tolls", "E. HEMINGWAY"], ["The Sun Also Rises", "E. HEMINGWAY"], ["Heart of Darkness", "J. CONRAD"], ["Lord Jim", "J. CONRAD"], ["The Picture of Dorian Gray", "O. WILDE"],
+    ["The Importance of Being Earnest", "O. WILDE"], ["Dr Jekyll and Mr Hyde", "R. L. STEVENSON"], ["Treasure Island", "R. L. STEVENSON"], ["Robinson Crusoe", "D. DEFOE"], ["Gulliver's Travels", "J. SWIFT"],
+    ["Tristram Shandy", "L. STERNE"], ["Tom Jones", "H. FIELDING"], ["Vanity Fair", "W. M. THACKERAY"], ["The Scarlet Letter", "N. HAWTHORNE"], ["The Adventures of Huckleberry Finn", "M. TWAIN"],
+    ["The Adventures of Tom Sawyer", "M. TWAIN"], ["The Call of the Wild", "J. LONDON"], ["White Fang", "J. LONDON"], ["The Jungle Book", "R. KIPLING"], ["Kim", "R. KIPLING"],
+    ["The Time Machine", "H. G. WELLS"], ["The War of the Worlds", "H. G. WELLS"], ["The Invisible Man", "H. G. WELLS"], ["A Room with a View", "E. M. FORSTER"], ["Howards End", "E. M. FORSTER"],
+    ["A Passage to India", "E. M. FORSTER"], ["Mrs Dalloway", "V. WOOLF"], ["To the Lighthouse", "V. WOOLF"], ["Orlando", "V. WOOLF"], ["The Waves", "V. WOOLF"],
+    ["A Portrait of the Artist as a Young Man", "J. JOYCE"], ["Finnegans Wake", "J. JOYCE"], ["The Sound and the Fury", "W. FAULKNER"], ["As I Lay Dying", "W. FAULKNER"], ["Light in August", "W. FAULKNER"],
+    ["Beloved", "T. MORRISON"], ["Song of Solomon", "T. MORRISON"], ["Invisible Man", "R. ELLISON"], ["Native Son", "R. WRIGHT"], ["Things Fall Apart", "C. ACHEBE"],
+    ["One Hundred Years of Solitude", "G. G. MÁRQUEZ"], ["Love in the Time of Cholera", "G. G. MÁRQUEZ"], ["The Metamorphosis", "F. KAFKA"], ["The Trial", "F. KAFKA"], ["The Castle", "F. KAFKA"],
+    ["The Stranger", "A. CAMUS"], ["The Plague", "A. CAMUS"], ["Nausea", "J.-P. SARTRE"], ["Waiting for Godot", "S. BECKETT"], ["The Cherry Orchard", "A. CHEKHOV"],
+    ["The Seagull", "A. CHEKHOV"], ["Uncle Vanya", "A. CHEKHOV"], ["Three Sisters", "A. CHEKHOV"], ["The Death of Ivan Ilyich", "L. TOLSTOY"], ["Resurrection", "L. TOLSTOY"],
+    ["Fathers and Sons", "I. TURGENEV"], ["Dead Souls", "N. GOGOL"], ["The Overcoat", "N. GOGOL"], ["Eugene Onegin", "A. PUSHKIN"], ["The Master and Margarita", "M. BULGAKOV"],
+    ["Doctor Zhivago", "B. PASTERNAK"], ["One Day in the Life of Ivan Denisovich", "A. SOLZHENITSYN"], ["The Gulag Archipelago", "A. SOLZHENITSYN"], ["The Divine Comedy", "DANTE"], ["The Aeneid", "VIRGIL"],
+    ["The Canterbury Tales", "G. CHAUCER"], ["Paradise Lost", "J. MILTON"], ["Beowulf", "ANONYMOUS"], ["The Song of Roland", "ANONYMOUS"], ["The Nibelungenlied", "ANONYMOUS"],
+    ["Gilgamesh", "ANONYMOUS"], ["The Tale of Genji", "M. SHIKIBU"], ["The Analects", "CONFUCIUS"], ["The Art of War", "SUN TZU"], ["The Book of Five Rings", "M. MUSASHI"],
+    ["The Bhagavad Gita", "VYASA"], ["The Ramayana", "VALMIKI"], ["The Mahabharata", "VYASA"], ["The Arabian Nights", "ANONYMOUS"], ["The Decameron", "G. BOCCACCIO"],
+    ["The Prince", "N. MACHIAVELLI"], ["Utopia", "T. MORE"], ["The Praise of Folly", "ERASMUS"], ["Don Juan", "LORD BYRON"], ["Childe Harold's Pilgrimage", "LORD BYRON"],
+    ["The Rime of the Ancient Mariner", "S. T. COLERIDGE"], ["Lyrical Ballads", "W. WORDSWORTH & S. T. COLERIDGE"], ["Songs of Innocence and Experience", "W. BLAKE"], ["Leaves of Grass", "W. WHITMAN"], ["The Waste Land", "T. S. ELIOT"],
+    ["Four Quartets", "T. S. ELIOT"], ["The Raven", "E. A. POE"], ["Tales of the Grotesque and Arabesque", "E. A. POE"], ["The Complete Poems", "E. DICKINSON"], ["A Brief History of Time", "S. HAWKING"],
+    ["The Selfish Gene", "R. DAWKINS"], ["The Blind Watchmaker", "R. DAWKINS"], ["The Double Helix", "J. WATSON"], ["Pale Blue Dot", "C. SAGAN"], ["The Structure of Scientific Revolutions", "T. KUHN"],
+    ["Gödel, Escher, Bach", "D. HOFSTADTER"], ["The Feynman Lectures on Physics", "R. FEYNMAN"], ["Six Easy Pieces", "R. FEYNMAN"], ["QED", "R. FEYNMAN"], ["Relativity", "A. EINSTEIN"],
+    ["The Meaning of Relativity", "A. EINSTEIN"], ["A Mathematician's Apology", "G. H. HARDY"], ["Men of Mathematics", "E. T. BELL"], ["The Man Who Knew Infinity", "R. KANIGEL"], ["The Code Book", "S. SINGH"],
+    ["Fermat's Last Theorem", "S. SINGH"], ["The Information", "J. GLEICK"], ["Chaos", "J. GLEICK"], ["Thinking, Fast and Slow", "D. KAHNEMAN"], ["The Emperor's New Mind", "R. PENROSE"],
+    ["The Computational Brain", "P. CHURCHLAND"], ["Principles of Neural Science", "E. KANDEL"], ["Lehninger Principles of Biochemistry", "D. NELSON"], ["Molecular Biology of the Cell", "B. ALBERTS"], ["Concrete Mathematics", "R. GRAHAM"],
+    ["The Art of Computer Programming", "D. KNUTH"], ["Structure and Interpretation of Computer Programs", "H. ABELSON"], ["Introduction to Probability", "J. BLITZSTEIN"], ["Linear Algebra Done Right", "S. AXLE"], ["Calculus Made Easy", "S. THOMPSON"],
+    ["Organic Chemistry as a Second Language", "D. KLEIN"], ["Physical Chemistry", "P. ATKINS"], ["Inorganic Chemistry", "M. WIER"], ["Molecular Cell Biology", "H. LODISH"], ["Genetics: A Conceptual Approach", "B. PIERCE"],
+    ["Ecology", "R. RICKLEFS"], ["Introduction to Cosmology", "B. RYDEN"], ["Astrophysics in a Nutshell", "D. MAOZ"], ["Introduction to Quantum Mechanics", "D. GRIFFITHS"], ["Classical Mechanics", "H. GOLDSTEIN"],
+    ["Electrodynamics", "D. GRIFFITHS"], ["Statistical Mechanics", "R. PATHIA"], ["Introduction to Solid State Physics", "C. KITTEL"], ["The Elements of Statistical Learning", "T. HASTIE"], ["All of Statistics", "L. WASSERMAN"],
+    ["Pattern Recognition and Machine Learning", "C. BISHOP"], ["Deep Learning", "I. GOODFELLOW"], ["Reinforcement Learning", "R. SUTTON"], ["Artificial Intelligence: A Modern Approach", "S. RUSSELL"], ["Computer Networks", "A. TANENBAUM"],
+    ["Operating Systems", "A. TANENBAUM"], ["Database System Concepts", "A. SILBERSCHATZ"], ["Compilers", "A. AHO"], ["Introduction to the Theory of Computation", "M. SIPSER"], ["Cryptography and Network Security", "W. STALLINGS"],
+    ["The C Programming Language", "B. KERNIGHAN"], ["Nicomachean Ethics", "ARISTOTLE"], ["Politics", "ARISTOTLE"], ["Metaphysics", "ARISTOTLE"], ["The Symposium", "PLATO"],
+    ["Phaedo", "PLATO"], ["Apology", "PLATO"], ["Confessions", "AUGUSTINE"], ["City of God", "AUGUSTINE"], ["Summa Theologica", "T. AQUINAS"],
+    ["Discourse on Method", "R. DESCARTES"], ["Meditations on First Philosophy", "R. DESCARTES"], ["An Essay Concerning Human Understanding", "J. LOCKE"], ["Two Treatises of Government", "J. LOCKE"], ["A Treatise of Human Nature", "D. HUME"],
+    ["An Enquiry Concerning Human Understanding", "D. HUME"], ["Critique of Pure Reason", "I. KANT"], ["Critique of Practical Reason", "I. KANT"], ["Groundwork of the Metaphysics of Morals", "I. KANT"], ["Phenomenology of Spirit", "G. W. F. HEGEL"],
+    ["The World as Will and Representation", "A. SCHOPENHAUER"], ["Thus Spoke Zarathustra", "F. NIETZSCHE"], ["Beyond Good and Evil", "F. NIETZSCHE"], ["On the Genealogy of Morals", "F. NIETZSCHE"], ["The Gay Science", "F. NIETZSCHE"],
+    ["Being and Time", "M. HEIDEGGER"], ["Being and Nothingness", "J.-P. SARTRE"], ["The Second Sex", "S. DE BEAUVOIR"], ["The Feminine Mystique", "B. FRIEDAN"], ["A Theory of Justice", "J. RAWLS"],
+    ["On Liberty", "J. S. MILL"], ["Utilitarianism", "J. S. MILL"], ["The Subjection of Women", "J. S. MILL"], ["The Social Contract", "J.-J. ROUSSEAU"], ["Emile", "J.-J. ROUSSEAU"],
+    ["The Wealth of Nations", "A. SMITH"], ["The Theory of Moral Sentiments", "A. SMITH"], ["Das Kapital", "K. MARX"], ["The Communist Manifesto", "K. MARX & F. ENGELS"], ["The General Theory of Employment, Interest and Money", "J. M. KEYNES"],
+    ["The Road to Serfdom", "F. A. HAYEK"], ["The Constitution of Liberty", "F. A. HAYEK"], ["Capitalism and Freedom", "M. FRIEDMAN"], ["The Interpretation of Dreams", "S. FREUD"], ["Introductory Lectures on Psychoanalysis", "S. FREUD"],
+    ["Civilization and Its Discontents", "S. FREUD"], ["Beyond the Pleasure Principle", "S. FREUD"], ["The Archetypes and the Collective Unconscious", "C. G. JUNG"], ["Man and His Symbols", "C. G. JUNG"], ["The Varieties of Religious Experience", "W. JAMES"],
+    ["Pragmatism", "W. JAMES"], ["The Protestant Ethic and the Spirit of Capitalism", "M. WEBER"], ["Economy and Society", "M. WEBER"], ["Suicide", "E. DURKHEIM"], ["The Division of Labor in Society", "E. DURKHEIM"],
+    ["The Sociological Imagination", "C. W. MILLS"], ["The Presentation of Self in Everyday Life", "E. GOFFMAN"], ["The Structure of Social Action", "T. PARSONS"], ["The Elementary Forms of Religious Life", "E. DURKHEIM"], ["The Origins of Totalitarianism", "H. ARENDT"],
+    ["The Human Condition", "H. ARENDT"], ["Eichmann in Jerusalem", "H. ARENDT"], ["The Open Society and Its Enemies", "K. POPPER"], ["The Logic of Scientific Discovery", "K. POPPER"], ["Language, Truth and Logic", "A. J. AYER"],
+    ["Philosophical Investigations", "L. WITTGENSTEIN"], ["Tractatus Logico-Philosophicus", "L. WITTGENSTEIN"], ["Word and Object", "W. V. O. QUINE"], ["Naming and Necessity", "S. KRIPKE"], ["Anarchy, State, and Utopia", "R. NOZICK"],
+    ["The Idea of Justice", "A. SEN"], ["Development as Freedom", "A. SEN"], ["The End of History and the Last Man", "F. FUKUYAMA"], ["The Clash of Civilizations", "S. HUNTINGTON"], ["Guns, Germs, and Steel", "J. DIAMOND"],
+    ["Collapse", "J. DIAMOND"], ["Sapiens", "Y. N. HARARI"], ["Homo Deus", "Y. N. HARARI"], ["21 Lessons for the 21st Century", "Y. N. HARARI"], ["The Righteous Mind", "J. HAIDT"],
+    ["The Blank Slate", "S. PINKER"], ["The Better Angels of Our Nature", "S. PINKER"], ["How the Mind Works", "S. PINKER"], ["A History of the World", "A. MARWICK"], ["The Silk Roads", "P. FRANKOPAN"],
+    ["The Crusades", "T. ASBRIDGE"], ["The Decline and Fall of the Roman Empire", "E. GIBBON"], ["The History of the Peloponnesian War", "THUCYDIDES"], ["The Histories", "HERODOTUS"], ["The Annals", "TACITUS"],
+    ["The Twelve Caesars", "SUETONIUS"], ["The Persian Wars", "HERODOTUS"], ["The Alexiad", "A. KOMNENE"], ["The Muqaddimah", "I. KHALDUN"], ["The Travels", "I. BATTUTA"],
+    ["The Travels of Marco Polo", "MARCO POLO"], ["The Voyage of the Beagle", "C. DARWIN"], ["The Journals of Captain Cook", "J. COOK"], ["The Exploration of the Colorado River", "J. W. POWELL"], ["The Worst Journey in the World", "A. CHERRY-GARRARD"],
+    ["Endurance", "A. LANSING"], ["Into Thin Air", "J. KRAKAUER"], ["Into the Wild", "J. KRAKAUER"], ["The Perfect Storm", "S. JUNGER"], ["A Short History of Nearly Everything", "B. BRYSON"],
+    ["A Walk in the Woods", "B. BRYSON"], ["Notes from a Small Island", "B. BRYSON"], ["The Innocents Abroad", "M. TWAIN"], ["Roughing It", "M. TWAIN"], ["The Oregon Trail", "F. PARKMAN"],
+    ["The Prairie Traveler", "R. MARCY"], ["Seven Years in Tibet", "H. HARRER"], ["The Snow Leopard", "P. MATTHIESSEN"], ["The Songlines", "B. CHATWIN"], ["In Patagonia", "B. CHATWIN"],
+    ["The Road to Oxiana", "R. BYRON"], ["Arabian Sands", "W. THESIGER"], ["The Marsh Arabs", "W. THESIGER"], ["A Time of Gifts", "P. FERMOR"], ["Between the Woods and the Water", "P. FERMOR"],
+    ["The Great Railway Bazaar", "P. THEROUX"], ["The Old Patagonian Express", "P. THEROUX"], ["Dark Star Safari", "P. THEROUX"], ["The Geography of Nowhere", "J. H. KUNSTLER"], ["The Death and Life of Great American Cities", "J. JACOBS"],
+    ["The Image of the City", "K. LYNCH"], ["A Pattern Language", "C. ALEXANDER"], ["The Timeless Way of Building", "C. ALEXANDER"], ["How Buildings Learn", "S. BRAND"], ["The Revenge of Geography", "R. KAPLAN"],
+    ["Prisoners of Geography", "T. MARSHALL"], ["The Map That Changed the World", "S. WINCHESTER"], ["Krakatoa", "S. WINCHESTER"], ["The Professor and the Madman", "S. WINCHESTER"], ["The Meaning of Everything", "S. WINCHESTER"],
+    ["The Surgeon of Crowthorne", "S. WINCHESTER"]
+];        const SPINE_PAL = ["#7a1f2b", "#1f3d6b", "#1e5b3a", "#b8892b", "#4b2a6b", "#6b3f1f", "#a8452b", "#245e5e", "#d8cdb0", "#2e2e48", "#8c2f5d", "#3b4a2a", "#5a1e1e", "#16324f", "#c2a14d", "#40304f"];
+        const TILE_COL = [];
+        const SPINE_ATLAS = (() => {
+            const CW = 64, CH = 512, COLS = 32, ROWS = 4, cv = document.createElement("canvas"); cv.width = CW * COLS; cv.height = CH * ROWS;
+            const c = cv.getContext("2d"); c.lineCap = "round";
+            for (let i = 0; i < COLS * ROWS; i++) {
+                const col = i % COLS, row = Math.floor(i / COLS), x0 = col * CW, y0 = (ROWS - 1 - row) * CH;
+                const base = new THREE.Color(SPINE_PAL[(i * 5 + Math.floor(i / 16)) % 16]); TILE_COL[i] = "#" + base.getHexString();
+                const lum = .299 * base.r + .587 * base.g + .114 * base.b, ink = lum > .5 ? "#2a1a10" : "#f3e3b5", ink2 = lum > .5 ? "#4a3220" : "#d9b66a";
+                // cylindrical cloth spine
+                const gr = c.createLinearGradient(x0, 0, x0 + CW, 0);
+                gr.addColorStop(0, "#" + base.clone().multiplyScalar(.62).getHexString()); gr.addColorStop(.3, "#" + base.clone().multiplyScalar(1.12).getHexString());
+                gr.addColorStop(.7, "#" + base.clone().multiplyScalar(.95).getHexString()); gr.addColorStop(1, "#" + base.clone().multiplyScalar(.55).getHexString());
+                c.fillStyle = gr; c.fillRect(x0, y0, CW, CH);
+                for (let k = 0; k < 260; k++) { c.fillStyle = `rgba(${Math.random() < .5 ? "255,255,255" : "0,0,0"},${.03 + Math.random() * .05})`; c.fillRect(x0 + Math.random() * CW, y0 + Math.random() * CH, 1 + Math.random() * 2, 1 + Math.random() * 2); }
+                // raised bands + ornaments
+                const band = (y, hh) => { c.fillStyle = ink2; c.fillRect(x0 + 4, y0 + y, CW - 8, hh); c.fillStyle = "rgba(255,255,255,.25)"; c.fillRect(x0 + 4, y0 + y, CW - 8, 1); };
+                band(26, 3); band(36, 1.5); band(CH - 30, 3); band(CH - 40, 1.5);
+                c.fillStyle = ink2; c.beginPath(); c.moveTo(x0 + 32, y0 + 10); c.lineTo(x0 + 38, y0 + 18); c.lineTo(x0 + 32, y0 + 22); c.lineTo(x0 + 26, y0 + 18); c.closePath(); c.fill();
+                c.strokeStyle = ink2; c.lineWidth = 2; c.beginPath(); c.arc(x0 + 32, y0 + CH - 14, 7, 0, 7); c.stroke(); c.beginPath(); c.arc(x0 + 32, y0 + CH - 14, 2.5, 0, 7); c.fill();
+                const [title, author] = BOOK_TITLES[i % BOOK_TITLES.length];
+                const fa = /[\u0600-\u06FF]/.test(title), label = i % 4 === 0;
+                if (label) { c.fillStyle = "#efe3c4"; c.fillRect(x0 + 8, y0 + 70, CW - 16, 300); c.strokeStyle = "#7a5a2a"; c.lineWidth = 2; c.strokeRect(x0 + 11, y0 + 73, CW - 22, 294); }
+                // title (reads bottom -> top, like a real spine)
+                c.save(); c.translate(x0 + 32, y0 + (label ? 220 : 235)); c.rotate(-Math.PI / 2); c.textAlign = "center"; c.textBaseline = "middle"; c.direction = fa ? "rtl" : "ltr";
+                let fs = fa ? 34 : 33; const fam = fa ? "Tahoma, Arial, sans-serif" : "Georgia, 'Times New Roman', serif", maxW = label ? 280 : 300;
+                c.font = `${fa ? "bold" : "bold"} ${fs}px ${fam}`; const w0 = c.measureText(title).width; if (w0 > maxW) { fs = Math.max(14, fs * maxW / w0); c.font = `bold ${fs}px ${fam}`; }
+                c.fillStyle = label ? "#2a1a10" : ink; c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 1; c.fillText(title, 0, 0); c.restore();
+                // author
+                c.save(); c.translate(x0 + 32, y0 + CH - 100); c.rotate(-Math.PI / 2); c.textAlign = "center"; c.textBaseline = "middle"; c.direction = /[\u0600-\u06FF]/.test(author) ? "rtl" : "ltr";
+                let fs2 = 16; c.font = `${fs2}px ${fam}`; const w1 = c.measureText(author).width; if (w1 > 100) { fs2 = Math.max(9, fs2 * 100 / w1); c.font = `${fs2}px ${fam}`; }
+                c.fillStyle = ink2; c.fillText(author, 0, 0); c.restore();
             }
-            ctx.fillText(title, 0, 0, maxTextWidth);
-            ctx.restore();
-
-            const tex = new THREE.CanvasTexture(cv);
-            tex.colorSpace = THREE.SRGBColorSpace;
-            tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-            titleIndexByName.set(title, index);
-            return tex;
-        });
-
+            const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy()); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.needsUpdate = true; return t;
+        })();
+        const bookGeo = new THREE.BoxGeometry(1, 1, 1), tileAttr = new THREE.InstancedBufferAttribute(new Float32Array(5200 * 2), 2);
+        bookGeo.setAttribute("aTile", tileAttr);
+        const bookMat = new THREE.MeshStandardMaterial({ roughness: .6, envMap: ENV, envMapIntensity: .3 }); envMats.push(bookMat);
+        bookMat.onBeforeCompile = sh => {
+            sh.uniforms.uSpine = { value: SPINE_ATLAS };
+            sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec2 aTile;\nvarying vec2 vTileUv;\nvarying float vFace;")
+                .replace("#include <begin_vertex>", "#include <begin_vertex>\nvTileUv = (uv + aTile) * vec2(1.0 / 32.0, 1.0 / 4.0);\nvFace = step(0.5, normal.z);");
+            sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform sampler2D uSpine;\nvarying vec2 vTileUv;\nvarying float vFace;")
+                .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, texture2D(uSpine, vTileUv).rgb, vFace);");
+        };
+        const bookMesh = new THREE.InstancedMesh(bookGeo, bookMat, 5200);
+        let bookN = 0; scene.add(bookMesh);
+        const BCOL = [0x8b2e2e, 0x2e5a8b, 0x2e7a4a, 0xc9a23a, 0x5a3a7a, 0x7a4a2e, 0xb85c38, 0x2f6f6f, 0xd9cdb4, 0x3a3a52, 0x9a3b6a];
         function shelf(x, z, ry) {
-            const g = new THREE.Group();
-            g.position.set(x, 0, z);
-            g.rotation.y = ry;
-            scene.add(g);
-            /* Ensure world transform is current before instancing shelf books. */
-            g.updateMatrix();
-            g.updateMatrixWorld(true);
-
-            const W = 2.3, D = .45, H = 3.6;
-            const dm = new THREE.Object3D();
-            const tc = new THREE.Color();
-
-            box(W, H, .05, 0x24170f, 0, H / 2, -D / 2 + .025, g);
-            box(.07, H, D, 0x5a3a24, -W / 2, H / 2, 0, g);
-            box(.07, H, D, 0x5a3a24, W / 2, H / 2, 0, g);
-
+            const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; scene.add(g); g.updateMatrix();
+            const W = 2.3, D = .45, H = 3.6, dm = new THREE.Object3D(), tc = new THREE.Color();
+            box(W, H, .05, 0x24170f, 0, H / 2, -D / 2 + .025, g); box(.07, H, D, 0x5a3a24, -W / 2, H / 2, 0, g); box(.07, H, D, 0x5a3a24, W / 2, H / 2, 0, g);
             for (let l = 0; l < 6; l++) {
-                const y = .08 + l * .68;
-                box(W, .06, D, 0x6b4630, 0, y, 0, g);
+                const y = .08 + l * .68; box(W, .06, D, 0x6b4630, 0, y, 0, g);
                 if (l === 5) continue;
-
                 let cx = -W / 2 + .12;
                 while (cx < W / 2 - .12 && bookN < 5190) {
-                    const w = .105 + Math.random() * .065;
-                    const h = .42 + Math.random() * .18;
-                    if (Math.random() < .045) {
-                        cx += .13;
-                        continue;
-                    }
-
-                    const bookColor = BCOL[Math.floor(Math.random() * BCOL.length)];
-                    dm.position.set(cx + w / 2, y + .03 + h / 2, 0);
-                    dm.rotation.set(0, 0, Math.random() < .04 ? .12 : 0);
-                    dm.scale.set(w, h, D - .12);
-                    dm.updateMatrix();
-
-                    bookMesh.setMatrixAt(bookN, g.matrixWorld.clone().multiply(dm.matrix));
-                    bookMesh.setColorAt(
-                        bookN,
-                        tc.setHex(bookColor).offsetHSL(0, 0, (Math.random() - .5) * .1)
-                    );
-
-                    /* Every placed book gets its own complete title. */
-                    const titleIndex = bookN % BOOK_TITLES.length;
-                    const labelLocal = new THREE.Vector3(
-                        cx + w / 2,
-                        y + .03 + h * .52,
-                        D / 2 + .008
-                    );
-                    titlePlacements[titleIndex].push({
-                        group: g,
-                        position: labelLocal,
-                        width: Math.max(.092, w * .94),
-                        height: Math.min(.48, h * .88)
-                    });
-
-                    bookN++;
-                    cx += w + .012;
+                    const w = .04 + Math.random() * .07, h = .38 + Math.random() * .22;
+                    if (Math.random() < .06) { cx += .13; continue; }
+                    dm.position.set(cx + w / 2, y + .03 + h / 2, 0); dm.rotation.set(0, 0, Math.random() < .04 ? .18 : 0); dm.scale.set(w, h, D - .12); dm.updateMatrix();
+                    bookMesh.setMatrixAt(bookN, g.matrix.clone().multiply(dm.matrix));
+                    const ti = Math.floor(Math.random() * 128); tileAttr.setXY(bookN, ti % 32, Math.floor(ti / 32)); bookMesh.setColorAt(bookN, tc.set(TILE_COL[ti])); bookN++; cx += w + .008;
                 }
             }
-
             box(W + .12, .1, D + .06, 0x4a2f1d, 0, H + .05, 0, g);
-            g.updateMatrixWorld(true);
         }
-
-        for (let x = -9.6; x <= 9.7; x += 2.4) shelf(x, 12.62, Math.PI);
-        for (const z of [-5.6, -3.2, -.8, 1.6, 4, 6.4, 8.8, 11.2]) {
-            shelf(-11.62, z, Math.PI / 2);
-            shelf(11.62, z, -Math.PI / 2);
-        }
-
-        /* Convert local shelf positions to world-space instance matrices. */
-        const labelDummy = new THREE.Object3D();
-        for (let titleIndex = 0; titleIndex < BOOK_TITLES.length; titleIndex++) {
-            const placements = titlePlacements[titleIndex];
-            if (!placements.length) continue;
-
-            const labelMaterial = new THREE.MeshBasicMaterial({
-                map: titleTextures[titleIndex],
-                transparent: true,
-                alphaTest: .04,
-                side: THREE.DoubleSide,
-                depthWrite: false,
-                toneMapped: false
-            });
-            const labels = new THREE.InstancedMesh(
-                new THREE.PlaneGeometry(1, 1),
-                labelMaterial,
-                placements.length
-            );
-
-            for (let i = 0; i < placements.length; i++) {
-                const item = placements[i];
-                item.group.updateMatrixWorld(true);
-
-                const worldPosition = item.group.localToWorld(item.position.clone());
-                const worldQuaternion = item.group.getWorldQuaternion(new THREE.Quaternion());
-
-                labelDummy.position.copy(worldPosition);
-                labelDummy.quaternion.copy(worldQuaternion);
-                labelDummy.scale.set(item.width, item.height, 1);
-                labelDummy.updateMatrix();
-                labels.setMatrixAt(i, labelDummy.matrix);
-            }
-
-            labels.instanceMatrix.needsUpdate = true;
-            scene.add(labels);
-        }
-
-        bookMesh.count = bookN;
-        bookMesh.instanceMatrix.needsUpdate = true;
-        if (bookMesh.instanceColor) bookMesh.instanceColor.needsUpdate = true;
+        for (let x = -9.6; x <= 9.7; x += 2.4) shelf(x, 18.62, Math.PI);
+        for (const z of [-5.6, -3.2, -.8, 1.6, 4, 6.4, 8.8, 11.2, 13.6, 15.9, 18.0]) { shelf(-11.62, z, Math.PI / 2); shelf(11.62, z, -Math.PI / 2); }
+        tileAttr.needsUpdate = true; bookMesh.count = bookN; bookMesh.instanceMatrix.needsUpdate = true; if (bookMesh.instanceColor) bookMesh.instanceColor.needsUpdate = true;
 
         /* rug + seats */
         const rugMat = new THREE.MeshStandardMaterial({
@@ -2136,10 +2029,91 @@
             const l = new THREE.PointLight(0xffc98a, 7, 9, 2); l.position.set(x, 1.6, z); parent.add(l);
             solid(wx, wz, .3);
         }
+        /* ---- botanical detail: veined leaves, bark, real branching trees ---- */
+        function drawLeaf(c, bump) {
+            const P = () => { c.beginPath(); c.moveTo(256, 498); c.bezierCurveTo(72, 410, 36, 170, 256, 14); c.bezierCurveTo(476, 170, 440, 410, 256, 498); c.closePath(); };
+            const hw = y => 205 * Math.pow(Math.max(0, Math.sin(Math.PI * (498 - y) / 484)), .78);
+            c.lineCap = "round"; c.clearRect(0, 0, 512, 512);
+            c.save(); P(); c.clip();
+            if (bump) { c.fillStyle = "#6a6a6a"; c.fillRect(0, 0, 512, 512); for (let i = 0; i < 1400; i++) { const v = 90 + Math.random() * 40; c.fillStyle = `rgb(${v},${v},${v})`; c.fillRect(Math.random() * 512, Math.random() * 512, 3, 3); } }
+            else {
+                const g = c.createRadialGradient(256, 300, 20, 256, 260, 270); g.addColorStop(0, "#74bd54"); g.addColorStop(.6, "#4f9a3e"); g.addColorStop(1, "#2c6a2c"); c.fillStyle = g; c.fillRect(0, 0, 512, 512);
+                for (let i = 0; i < 900; i++) { c.fillStyle = `rgba(${Math.random() < .5 ? "20,70,20" : "190,230,120"},${.04 + Math.random() * .06})`; c.fillRect(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 3, 2 + Math.random() * 3); }
+            }
+            const vein = (x0, y0, cx_, cy_, x1, y1, w, col) => { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(cx_, cy_, x1, y1); c.stroke(); };
+            const light = bump ? "#ffffff" : "#cfe596", mid = bump ? "#dddddd" : "#a9d36d", fine = bump ? "rgba(255,255,255,.55)" : "rgba(185,222,125,.5)";
+            // secondary veins (arching toward the margin) + tertiary network
+            for (let i = 0; i < 12; i++) {
+                const y = 470 - i * 36, h = hw(y - 60) * .93;
+                for (const s of [-1, 1]) {
+                    const ex = 256 + s * h, ey = y - 70 - i * 2;
+                    vein(256, y, 256 + s * h * .55, y - 18, ex, ey, 4.2 - i * .2, mid);
+                    for (let k = 1; k <= 6; k++) { const t = k / 7, bx = 256 + (ex - 256) * t, by = y + (ey - y) * t - 8 * Math.sin(Math.PI * t); vein(bx, by, bx + s * 14, by - 22, bx + s * 26, by - 38, 1.5, fine); vein(bx, by, bx + s * 10, by + 14, bx + s * 16, by + 30, 1.1, fine); }
+                }
+            }
+            // midrib: thick at base, tapering to the tip
+            for (let y = 498; y > 20; y -= 6) { c.strokeStyle = light; c.lineWidth = 2 + 8 * (y - 20) / 478; c.beginPath(); c.moveTo(256, y); c.lineTo(256, y - 7); c.stroke(); }
+            c.restore();
+            if (!bump) { P(); c.strokeStyle = "rgba(25,70,25,.65)"; c.lineWidth = 3; c.stroke(); }
+            c.strokeStyle = bump ? "#fff" : "#9fc36a"; c.lineWidth = 7; c.beginPath(); c.moveTo(256, 497); c.lineTo(256, 511); c.stroke();   // petiole
+        }
+        const LEAF_TEX = ctex(cvs(512, 512, c => drawLeaf(c, false))), LEAF_BUMP = ctex(cvs(512, 512, c => drawLeaf(c, true)));
+        const LEAF_MAT = new THREE.MeshStandardMaterial({ map: LEAF_TEX, bumpMap: LEAF_BUMP, bumpScale: 2.4, alphaTest: .5, side: THREE.DoubleSide, roughness: .5, envMap: ENV, envMapIntensity: .35 }); envMats.push(LEAF_MAT);
+        const LEAF_GEO = (() => { const g = new THREE.PlaneGeometry(1, 1, 6, 10), p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i) + .5; p.setXYZ(i, x, y, -.9 * x * x - .35 * y * y); } g.computeVertexNormals(); return g; })();
+        const BARK = ctex(cvs(512, 128, (c, w, h) => {
+            c.fillStyle = "#5a4030"; c.fillRect(0, 0, w, h);
+            for (let i = 0; i < 520; i++) { const y = Math.random() * h, l = 40 + Math.random() * 220, x = Math.random() * w, d = Math.random() < .5; c.strokeStyle = d ? `rgba(30,18,10,${.2 + Math.random() * .4})` : `rgba(190,150,110,${.08 + Math.random() * .2})`; c.lineWidth = .8 + Math.random() * 2.6; c.beginPath(); c.moveTo(x, y); c.bezierCurveTo(x + l * .3, y + Math.random() * 6 - 3, x + l * .7, y + Math.random() * 6 - 3, x + l, y + Math.random() * 4 - 2); c.stroke(); }
+        }), 1, 1);
+        const BARK_MAT = new THREE.MeshStandardMaterial({ map: BARK, bumpMap: BARK, bumpScale: 4, roughness: .92, envMap: ENV, envMapIntensity: .2 }); envMats.push(BARK_MAT);
+        function tubeGeo(pts, r0, r1, seg = 16, rad = 8) {
+            const cu_ = new THREE.CatmullRomCurve3(pts), g = new THREE.TubeGeometry(cu_, seg, 1, rad, false), p = g.attributes.position;
+            for (let i = 0; i <= seg; i++) { const c = cu_.getPointAt(i / seg), r = r0 + (r1 - r0) * Math.pow(i / seg, .9); for (let j = 0; j <= rad; j++) { const k = i * (rad + 1) + j; p.setXYZ(k, c.x + (p.getX(k) - c.x) * r, c.y + (p.getY(k) - c.y) * r, c.z + (p.getZ(k) - c.z) * r); } }
+            g.computeVertexNormals(); return g;
+        }
+        function leafMesh(list, parent, shadow = true) {
+            if (!list.length) return null;
+            const im = new THREE.InstancedMesh(LEAF_GEO, LEAF_MAT, list.length), m = new THREE.Matrix4(), col = new THREE.Color();
+            list.forEach((l, i) => { m.compose(l.p, l.q, l.s); im.setMatrixAt(i, m); im.setColorAt(i, col.setHSL(l.h, l.sa, l.l)); });
+            im.instanceMatrix.needsUpdate = true; im.instanceColor.needsUpdate = true; im.castShadow = shadow; parent.add(im); return im;
+        }
+        const _Y = new THREE.Vector3(0, 1, 0);
+        function mkLeaf(p, dir, size, R) {
+            const q = new THREE.Quaternion().setFromUnitVectors(_Y, dir.clone().normalize()), r = new THREE.Quaternion().setFromAxisAngle(dir.clone().normalize(), R() * 6.283);
+            return { p: p.clone(), q: r.multiply(q), s: new THREE.Vector3(size * .55, size, size), h: .24 + R() * .1, sa: .45 + R() * .25, l: .42 + R() * .16 };
+        }
+        function pot(parent, rad = .44, h = .6) {
+            const pts = [[.001, 0], [rad * .62, 0], [rad * .8, h * .06], [rad * .96, h * .9], [rad * 1.08, h * .93], [rad * 1.08, h], [rad * .94, h], [rad * .9, h * .96]].map(([r, y]) => new THREE.Vector2(r, y));
+            const m = new THREE.Mesh(new THREE.LatheGeometry(pts, 48), mat(0x9a4f30, { roughness: .8 })); parent.add(m);
+            const soil = new THREE.Mesh(new THREE.CircleGeometry(rad * .9, 32), mat(0x2a1a10, { roughness: 1 })); soil.rotation.x = -Math.PI / 2; soil.position.y = h * .96; parent.add(soil);
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(rad * 1.06, .012, 8, 48), mat(0xc9a24a, { metalness: .7, roughness: .3 })); ring.rotation.x = Math.PI / 2; ring.position.y = h * .9; parent.add(ring);
+        }
+        function buildTree(x, z, H, seed, W = 1) {
+            let sd = seed * 9301 + 49297; const R = () => (sd = sd * 16807 % 2147483647) / 2147483647, V = (a, b, c) => new THREE.Vector3(a, b, c);
+            const root = new THREE.Group(); root.position.set(x, 0, z); scene.add(root); pot(root, .46, .62);
+            const geos = [], leaves = [];
+            const branch = (p0, d0, len, r0, depth) => {
+                const pts = [p0.clone()]; let p = p0.clone(), d = d0.clone();
+                for (let i = 1; i <= 4; i++) { d.add(V((R() - .5) * .35, (R() - .3) * .2 + .06, (R() - .5) * .35)).normalize(); p = p.clone().addScaledVector(d, len / 4); pts.push(p); }
+                geos.push(tubeGeo(pts, r0, r0 * .45, 12, 7));
+                if (depth === 0) { for (let i = 1; i <= 4; i++) for (let k = 0; k < (i === 4 ? 5 : 3); k++) { const dir = d.clone().multiplyScalar(.5).add(V(R() - .5, R() - .5, R() - .5).multiplyScalar(1.5)); dir.y -= .22; leaves.push(mkLeaf(pts[i].clone().add(V((R() - .5) * .05, (R() - .5) * .05, (R() - .5) * .05)), dir, .2 + R() * .09, R)); } return; }
+                const n = depth === 2 ? 3 : 3;
+                for (let k = 0; k < n; k++) { const idx = Math.max(1, Math.min(4, Math.round((.35 + .65 * (k + R() * .5) / n) * 4))), a = R() * 6.283, nd = d.clone().multiplyScalar(.5).add(V(Math.cos(a) * .8, .22, Math.sin(a) * .8)).normalize(); branch(pts[idx], nd, len * (.58 + R() * .15), r0 * .58, depth - 1); }
+            };
+            // trunk with a gentle S-curve
+            const tp = [V(0, .5, 0), V(.05, H * .22, -.04), V(-.04, H * .45, .05), V(.03, H * .66, -.02), V(0, H * .8, 0)];
+            geos.push(tubeGeo(tp, .075, .032, 24, 9));
+            for (let i = 0; i < 8; i++) { const t = .32 + .68 * i / 7, c = new THREE.CatmullRomCurve3(tp).getPointAt(Math.min(.99, t)), a = i * 2.4 + R(), out = V(Math.cos(a), .0, Math.sin(a)); branch(c, out.multiplyScalar(.9).add(V(0, .55, 0)).normalize(), H * W * (.2 + .06 * (1 - t)), .034 * (1.15 - t * .4), 2); }
+            branch(V(0, H * .8, 0), V(0, 1, 0), H * .16 * Math.sqrt(W), .026, 2);
+            const tr = new THREE.Mesh(mergeGeometries(geos, false), BARK_MAT); tr.castShadow = true; root.add(tr);
+            leafMesh(leaves, root, true);
+            solid(x, z, .5);
+        }
         function plant(x, z) {
-            cyl(.22, .17, .38, 0x8a4b2d, x, .19, z); const gm = mat(0x2f8f4e, { roughness: .9 });
-            for (let i = 0; i < 7; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(.2 + Math.random() * .1, 10, 8), gm); const a = i * 2.4; s.position.set(x + Math.sin(a) * .2, .6 + i * .13, z + Math.cos(a) * .2); scene.add(s); }
-            solid(x, z, .35);
+            let sd = Math.floor(Math.abs(x * 131 + z * 71)) + 5; const R = () => (sd = sd * 16807 % 2147483647) / 2147483647;
+            const root = new THREE.Group(); root.position.set(x, 0, z); scene.add(root); pot(root, .24, .4);
+            const leaves = [];
+            for (let i = 0; i < 38; i++) { const a = R() * 6.283, tilt = .25 + R() * .85, dir = new THREE.Vector3(Math.sin(tilt) * Math.cos(a), Math.cos(tilt), Math.sin(tilt) * Math.sin(a)); leaves.push(mkLeaf(new THREE.Vector3(Math.cos(a) * .05, .38, Math.sin(a) * .05), dir, .3 + R() * .16, R)); }
+            leafMesh(leaves, root, true); solid(x, z, .35);
         }
         function nook(cx, cz, phi, sofaCol, armCol) {
             const g = new THREE.Group(); g.position.set(cx, 0, cz); g.rotation.y = phi; scene.add(g);
@@ -2152,58 +2126,84 @@
             const [w1, w2] = L(-1.95, 2.2); floorLamp(g, -1.95, 2.2, w1, w2);
             const [p1, p2] = L(1.95, 2.2); plant(p1, p2);
         }
-        const fire = []; const fireL = new THREE.PointLight(0xff8a3a, 8, 10, 2); fireL.userData.i0 = 8; fireL.position.set(0, .9, -6.6); scene.add(fireL);
+        const fireL = new THREE.PointLight(0xff8a3a, 8, 10, 2); fireL.userData.i0 = 8; fireL.position.set(0, .9, -6.6); scene.add(fireL);
         box(3.4, 1.3, .7, 0x6f6a66, 0, .65, -7.45); box(3.8, .1, .9, 0x8a8480, 0, 1.35, -7.4); box(1.7, .85, .2, 0x050505, 0, .5, -7.12);
-        cyl(.08, .08, 1.1, 0x3a2314, -.3, .12, -7.0).rotation.z = Math.PI / 2; cyl(.08, .08, 1.1, 0x3a2314, .2, .2, -7.0).rotation.z = Math.PI / 2;
-        /* ---- layered procedural fireplace ---- */
-        const flameCanvas = (inner, outer, seed = 0) => {
-            const c = document.createElement("canvas"); c.width = 256; c.height = 512;
-            const x = c.getContext("2d");
-            const g = x.createLinearGradient(0, 512, 0, 0);
-            g.addColorStop(0, inner); g.addColorStop(.34, "#ffb52e"); g.addColorStop(.68, outer); g.addColorStop(1, "rgba(255,90,12,0)");
-            x.fillStyle = g; x.beginPath(); x.moveTo(128, 512);
-            x.bezierCurveTo(28, 420, 45, 310, 100, 220);
-            x.bezierCurveTo(88, 150, 154, 105 + seed * 8, 148, 18);
-            x.bezierCurveTo(245, 130, 190, 190, 222, 270);
-            x.bezierCurveTo(260, 370, 220, 455, 128, 512); x.closePath(); x.fill();
-            const glow = x.createRadialGradient(128, 390, 8, 128, 390, 150);
-            glow.addColorStop(0, "rgba(255,246,190,.9)"); glow.addColorStop(.35, "rgba(255,177,48,.25)"); glow.addColorStop(1, "rgba(255,100,0,0)");
-            x.globalCompositeOperation = "screen"; x.fillStyle = glow; x.fillRect(0, 220, 256, 292);
-            return new THREE.CanvasTexture(c);
-        };
-        const flameMats = [
-            new THREE.MeshBasicMaterial({ map: flameCanvas("#fff4bd", "#ff5a12", 0), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: .95, side: THREE.DoubleSide }),
-            new THREE.MeshBasicMaterial({ map: flameCanvas("#fff0a0", "#ff8a16", 1), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: .8, side: THREE.DoubleSide }),
-            new THREE.MeshBasicMaterial({ map: flameCanvas("#fff9d6", "#ff3d0a", 2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: .72, side: THREE.DoubleSide })
-        ];
-        for (let i = 0; i < 9; i++) {
-            const f = new THREE.Mesh(new THREE.PlaneGeometry(.34 + (i % 3) * .12, .72 + (i % 4) * .13), flameMats[i % flameMats.length]);
-            f.position.set((i - 4) * .19, .52 + (i % 3) * .035, -7.015 + (i % 2) * .025);
-            f.rotation.z = (i - 4) * .055; scene.add(f); fire.push(f);
+        /* ---- natural fire: procedural flame shader tongues, glowing coals, burning logs, rising embers, flickering light ---- */
+        let fireFlick = 1;
+        const FIRE_VS = "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
+        const FIRE_FS = `
+            uniform float uTime; uniform float uSeed; varying vec2 vUv;
+            float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+            float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+            float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * vn(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return v; }
+            void main(){
+                vec2 uv = vUv; float y = uv.y, x = (uv.x - 0.5) * 2.0, t = uTime + uSeed;
+                vec2 p = vec2(uv.x * 2.5 + uSeed, y * 1.6 - t * 1.25);
+                float n = fbm(p * vec2(2.0, 2.4));
+                float n2 = fbm(p * vec2(4.0, 4.5) + vec2(0.0, -t * 0.7));
+                float sway = (fbm(vec2(t * 0.5 + uSeed, y * 1.5)) - 0.5) * 0.9 * y;
+                float w = pow(1.0 - y, 0.75) * (0.82 + 0.25 * n);
+                float d = abs(x + sway + (n - 0.5) * 0.55 * y) / max(w, 0.001);
+                float body = smoothstep(1.0, 0.15, d);
+                float tip = smoothstep(1.0, 0.55, y + (n2 - 0.5) * 0.5);
+                float base = smoothstep(0.0, 0.08, y);
+                float I = body * tip * base * (0.75 + 0.65 * n2);
+                I *= smoothstep(1.0, 0.8, abs(x));
+                I = clamp(I, 0.0, 1.0);
+                vec3 c1 = vec3(0.65, 0.08, 0.0), c2 = vec3(1.0, 0.42, 0.04), c3 = vec3(1.0, 0.78, 0.25), c4 = vec3(1.0, 0.96, 0.8);
+                vec3 col = mix(c1, c2, smoothstep(0.05, 0.4, I)); col = mix(col, c3, smoothstep(0.4, 0.7, I)); col = mix(col, c4, smoothstep(0.72, 1.0, I));
+                col = mix(col, vec3(0.35, 0.5, 1.0), smoothstep(0.12, 0.0, y) * 0.25 * body);
+                gl_FragColor = vec4(col * (0.9 + I), I);
+            }`;
+        const flames = [];
+        [[-.56, .5, .62, -6.97], [-.28, .62, .82, -6.96], [0, .76, .95, -6.95], [.28, .62, .84, -6.96], [.56, .5, .64, -6.97], [-.15, .55, .7, -7.04], [.2, .6, .78, -7.05], [0, .9, .85, -7.08]].forEach(([x, w, hh, z], i) => {
+            const gm = new THREE.PlaneGeometry(1, 1); gm.translate(0, .5, 0);
+            const sm = new THREE.ShaderMaterial({ vertexShader: FIRE_VS, fragmentShader: FIRE_FS, uniforms: { uTime: { value: 0 }, uSeed: { value: i * 3.71 + 1.3 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+            const mesh = new THREE.Mesh(gm, sm); mesh.scale.set(w, hh, 1); mesh.position.set(x, .14, z); mesh.renderOrder = 4; scene.add(mesh);
+            flames.push({ mesh, sm, sp: .9 + .25 * ((i * 7) % 5) / 5, w, h: hh });
+        });
+        const coalMat = new THREE.MeshStandardMaterial({
+            color: 0x140805, emissive: 0xff4d12, emissiveIntensity: 1.2, roughness: 1, emissiveMap: ctex(cvs(256, 64, (c, w, hh) => {
+                c.fillStyle = "#1a0600"; c.fillRect(0, 0, w, hh);
+                for (let i = 0; i < 120; i++) { const x = Math.random() * w, y = Math.random() * hh, r = 4 + Math.random() * 14, g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, "rgba(255,150,40,.95)"); g.addColorStop(.5, "rgba(230,70,10,.6)"); g.addColorStop(1, "rgba(120,20,0,0)"); c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }
+            }))
+        });
+        { const coal = new THREE.Mesh(new RoundedBoxGeometry(1.6, .1, .38, 3, .04), coalMat); coal.position.set(0, .11, -6.99); scene.add(coal); }
+        { const logM = new THREE.MeshStandardMaterial({ map: BARK, bumpMap: BARK, bumpScale: 3, color: 0x7a6050, emissive: 0x3a1204, roughness: .95 });
+            [[-.3, .15, -7.0, 0], [.2, .23, -7.0, 0], [0, .34, -7.02, .35]].forEach(([x, y, z, ry]) => { const l = new THREE.Mesh(new THREE.CylinderGeometry(.085, .075, 1.0, 24), logM); l.rotation.set(0, ry, Math.PI / 2); l.position.set(x, y, z); scene.add(l); }); }
+        const EN = 48, ePos = new Float32Array(EN * 3), eVel = [], eLife = new Float32Array(EN), eGeo = new THREE.BufferGeometry();
+        eGeo.setAttribute("position", new THREE.BufferAttribute(ePos, 3));
+        const emberTex = new THREE.CanvasTexture(cvs(64, 64, c => { const g = c.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, "rgba(255,240,200,1)"); g.addColorStop(.3, "rgba(255,160,60,.8)"); g.addColorStop(1, "rgba(255,80,0,0)"); c.fillStyle = g; c.fillRect(0, 0, 64, 64); }));
+        const embers = new THREE.Points(eGeo, new THREE.PointsMaterial({ map: emberTex, size: .06, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, color: 0xffb060 })); embers.frustumCulled = false; scene.add(embers);
+        const emberReset = i => { ePos[i * 3] = (Math.random() - .5) * 1.0; ePos[i * 3 + 1] = .25 + Math.random() * .25; ePos[i * 3 + 2] = -6.98 + (Math.random() - .5) * .1; eVel[i] = [(Math.random() - .5) * .25, .5 + Math.random() * .9, (Math.random() - .5) * .1]; eLife[i] = 1 + Math.random() * 2.2; };
+        for (let i = 0; i < EN; i++) { emberReset(i); eLife[i] *= Math.random(); }
+        function fireTick(t, dt) {
+            flames.forEach((f, i) => {
+                f.sm.uniforms.uTime.value = t * f.sp;
+                const k = .92 + .12 * Math.sin(t * (7 + i) + i * 1.7) + .06 * Math.sin(t * (13 + i * .7));
+                f.mesh.scale.set(f.w * (.95 + .08 * Math.sin(t * 5 + i)), f.h * k, 1);
+                f.mesh.rotation.y = Math.atan2(camera.position.x - f.mesh.position.x, camera.position.z - f.mesh.position.z);
+            });
+            fireFlick = .82 + .1 * Math.sin(t * 11.3) + .07 * Math.sin(t * 17.9 + 1.3) + .05 * Math.sin(t * 29.7 + .4);
+            coalMat.emissiveIntensity = 1.1 + .5 * Math.sin(t * 3.1) + .3 * Math.sin(t * 7.7 + 1);
+            for (let i = 0; i < EN; i++) {
+                eLife[i] -= dt; if (eLife[i] <= 0) emberReset(i);
+                const v = eVel[i]; v[0] += (Math.random() - .5) * .5 * dt; ePos[i * 3] += v[0] * dt; ePos[i * 3 + 1] += v[1] * dt; ePos[i * 3 + 2] += v[2] * dt;
+            }
+            eGeo.attributes.position.needsUpdate = true;
         }
-        const emberGeo = new THREE.BufferGeometry(), emberCount = 34;
-        const emberPos = new Float32Array(emberCount * 3), emberVel = [];
-        for (let i = 0; i < emberCount; i++) {
-            emberPos[i * 3] = (Math.random() - .5) * 1.45;
-            emberPos[i * 3 + 1] = .3 + Math.random() * 1.1;
-            emberPos[i * 3 + 2] = -7.0 + (Math.random() - .5) * .16;
-            emberVel.push(.12 + Math.random() * .42);
-        }
-        emberGeo.setAttribute("position", new THREE.BufferAttribute(emberPos, 3));
-        const embers = new THREE.Points(emberGeo, new THREE.PointsMaterial({ color: 0xffbd58, size: .045, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false }));
-        scene.add(embers);
-        const smoke = [];
-        for (let i = 0; i < 7; i++) {
-            const sm = new THREE.Mesh(new THREE.SphereGeometry(.09 + Math.random() * .08, 8, 8),
-                new THREE.MeshBasicMaterial({ color: 0x77717b, transparent: true, opacity: .075, depthWrite: false }));
-            sm.position.set((Math.random() - .5) * .55, 1.05 + i * .12, -7.03); scene.add(sm);
-            smoke.push({ mesh: sm, phase: Math.random() * Math.PI * 2, speed: .12 + Math.random() * .12 });
-        }
-        const fireGlow = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 1.7),
-            new THREE.MeshBasicMaterial({ color: 0xff7626, transparent: true, opacity: .14, blending: THREE.AdditiveBlending, depthWrite: false }));
-        fireGlow.position.set(0, .72, -6.91); scene.add(fireGlow);
         solid(-1.1, -7.2, .8); solid(1.1, -7.2, .8);
         nook(-8, 9.5, -Math.PI / 2, 0x3f5a2f, 0x6b3a22); nook(8, 9.5, Math.PI / 2, 0x4a2f6b, 0x1f5a5a);
+        /* ---- expanded hall: a new reading annex behind the old back-wall line ---- */
+        {
+            const ceil = new THREE.Mesh(new THREE.BoxGeometry(24, .26, 6.4), mat(0x8a7070, { map: ctex(plankCv(false), 3, 1), roughness: .5 })); ceil.position.set(0, 4.57, 16.15); scene.add(ceil);
+            const rg2 = new THREE.Mesh(new THREE.PlaneGeometry(9, 9), rugMat); rg2.rotation.x = -Math.PI / 2; rg2.position.set(0, .012, 15.8); scene.add(rg2);
+            nook(-7.2, 15.8, -Math.PI / 2, 0x7a2f3a, 0x2f4a6b); nook(7.2, 15.8, Math.PI / 2, 0x2f5a5a, 0x6b4a2a);
+            buildTree(-2.6, 17.7, 2.6, 57, .8); buildTree(2.6, 17.7, 2.6, 71, .8);
+            const pl = new THREE.PointLight(0xffd6a0, 14, 20, 2); pl.position.set(0, 3.6, 15.5); scene.add(pl);
+            cyl(.02, .02, .9, 0xc9a24a, 0, 4.15, 15.5);
+            const bulb = new THREE.Mesh(new THREE.SphereGeometry(.14, 16, 12), new THREE.MeshStandardMaterial({ color: 0xfff1cf, emissive: 0xffd28a, emissiveIntensity: 2 })); bulb.position.set(0, 3.62, 15.5); scene.add(bulb);
+        }
 
         /* central round table */
         {
@@ -2228,7 +2228,7 @@
             [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([a, b]) => { const c = cyl(.015, .015, 1.1, 0xc9a24a, a * 1.4, .6, b * 1.4, ch); });
             const cl = new THREE.PointLight(0xffd6a0, 30, 20, 2); cl.position.set(0, -.2, 0); ch.add(cl);
         }
-        plant(-10.6, -6.8); plant(10.6, -6.8);
+        buildTree(-9.5, -6.5, 2.9, 7); buildTree(-3.5, -6.6, 2.5, 19, .72); buildTree(3.5, -6.6, 2.5, 31, .72); buildTree(9.5, -6.5, 2.9, 43);
 
         /* ---- avatars ---- */
         function makeVid() {
@@ -2237,7 +2237,12 @@
             document.body.appendChild(v); return v;
         }
         function makeMedia() { const v = makeVid(); const tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace; return { v, tex, stream: null }; }
-function makeAvatar(name, id, gd) {
+const SKIN_BUMP = ctex(cvs(512, 512, c => {
+            c.fillStyle = "#808080"; c.fillRect(0, 0, 512, 512);
+            for (let i = 0; i < 9000; i++) { const v = 100 + Math.random() * 56; c.fillStyle = `rgba(${v},${v},${v},.55)`; c.fillRect(Math.random() * 512, Math.random() * 512, 1 + Math.random() * 1.5, 1 + Math.random() * 1.5); }
+            for (let i = 0; i < 900; i++) { c.fillStyle = "rgba(60,60,60,.5)"; c.beginPath(); c.arc(Math.random() * 512, Math.random() * 512, .7 + Math.random() * .9, 0, 7); c.fill(); }
+        }), 3, 2);
+        function makeAvatar(name, id, gd) {
             const g = new THREE.Group(), h = hueOf(id), F = gd === "f";
             /* ================= PALETTE ================= */
             const SK = ["#fde8d8", "#f9dcc6", "#f4d0b2", "#eec4a2"][h % 4];
@@ -2254,7 +2259,7 @@ function makeAvatar(name, id, gd) {
             function M0(c) { return new THREE.MeshStandardMaterial({ color: c, metalness: .9, roughness: .22 }); }
             const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: .7, ...o });
             const add = (geo, m, p, x, y, z, sx = 1, sy = 1, sz = 1) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); p.add(o); return o; };
-            const CAP = (r, l) => new THREE.CapsuleGeometry(r, l, 8, 16), SPH = r => new THREE.SphereGeometry(r, 24, 18), RB = (w, hh, d, r = .02) => new RoundedBoxGeometry(w, hh, d, 3, r);
+            const CAP = (r, l) => new THREE.CapsuleGeometry(r, l, 8, 16), SPH = r => new THREE.SphereGeometry(r, 36, 26), RB = (w, hh, d, r = .02) => new RoundedBoxGeometry(w, hh, d, 3, r);
 
             /* ================= TEXTURES ================= */
             const fabric = ctex(cvs(64, 64, c => { c.fillStyle = "#808080"; c.fillRect(0, 0, 128, 128); c.strokeStyle = "rgba(0,0,0,.3)"; c.lineWidth = 2; for (let i = 0; i < 128; i += 6) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 128); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(128, i); c.stroke(); } }), 5, 5);
@@ -2276,8 +2281,8 @@ function makeAvatar(name, id, gd) {
             }));
 
             /* ---- fresh youthful face: huge sparkling eyes, soft blush, gentle smile ---- */
-            const face = ctex(cvs(1536, 768, c => {
-                c.scale(.75, .75);
+            const face = ctex(cvs(2048, 1024, c => {
+                c.scale(1, 1);
                 const cx = 1536; c.lineCap = "round";
                 c.fillStyle = SK; c.fillRect(0, 0, 2048, 1024);
                 for (let i = 0; i < 2400; i++) { c.fillStyle = `rgba(${Math.random() < .5 ? "255,244,234" : "180,120,100"},${.015 + Math.random() * .03})`; c.fillRect(Math.random() * 2048, Math.random() * 1024, 2, 2); }
@@ -2466,7 +2471,7 @@ function makeAvatar(name, id, gd) {
             const lt = new THREE.CanvasTexture(lc);
             const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: lt, depthTest: false, transparent: true }));
             label.scale.set(2.4, .5, 1); label.renderOrder = 5; g.add(label);
-            g.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
+            g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
             const cam = makeMedia(), scr = makeMedia();
             const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.2), new THREE.MeshBasicMaterial({ map: cam.tex, side: THREE.DoubleSide }));
             panel.visible = false; g.add(panel); scene.add(g);
@@ -2517,15 +2522,15 @@ function makeAvatar(name, id, gd) {
             );
             if (!doorway) return false;
 
-            const hasThreeWins = computeState(ownStats.rolls).wins >= 1;
+            const hasThreeWins = computeState(ownStats.rolls).wins >= REQUIRED_WINS;
             return hasThreeWins && doorway.open;
         }
 
         const blocked = (x, z) => {
-            if (level === 2) { if (x < -26.6 || x > -13.4 || z < -6.6 || z > 6.6) return true; } else if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > BOUNDS.z1) return true;
+            if (level === 2) { if (x < -26.6 || x > -13.4 || z < -6.6 || z > 6.6) return true; } else if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > (level === 1 ? BOUNDS.z1 : BOUNDS.z1 + 6)) return true;
             const si = stairInfo(x, z);
             // Keep the physical doorway sealed until the three-win requirement is met.
-            const hasThreeWins = computeState(ownStats.rolls).wins >= 1;
+            const hasThreeWins = computeState(ownStats.rolls).wins >= REQUIRED_WINS;
             if (stairDoors.some(d => Math.abs(x - d.x) < 1.52 && Math.abs(z - d.z) < .48 && (!hasThreeWins || !d.open))) return true;
             if (si && (Math.abs(si.r - ST.R - ST.hw) < .22 || Math.abs(si.r - ST.R + ST.hw) < .22 || (level === 1 && si.th < .12))) return true;
             for (const s of solids) if ((s.lv || 0) === level && Math.hypot(x - s.x, z - s.z) < s.r + .25) return true;
