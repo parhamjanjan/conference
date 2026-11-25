@@ -1492,7 +1492,7 @@
                     c.textAlign = 'center'; c.fillStyle = '#f2d18a'; c.font = 'bold 48px Georgia';
                     c.fillText('THE UPPER FLOOR IS SEALED', w / 2, 72);
                     c.fillStyle = '#fff0cf'; c.font = 'bold 36px Arial';
-                    c.fillText('ONLY PLAYERS WITH 3 SNAKES & LADDERS WINS MAY ENTER', w / 2, 142);
+                    c.fillText('ONLY PLAYERS WITH 1 SNAKES & LADDERS WINS MAY ENTER', w / 2, 142);
                     c.fillStyle = '#b98cff'; c.font = 'italic 27px Georgia'; c.fillText('THREE VICTORIES. THEN THE DOOR REMEMBERS YOU.', w / 2, 202);
                 });
                 P(2.55, .72, label, dx, 3.12, dz + .255, 0);
@@ -1714,7 +1714,7 @@
             if (level === 2) { if (Math.hypot(px + 13.1, pz - 3) < 2.5) { flash(); setTimeout(() => { level = 1; px = 0; pz = -5.65; yaw = 0; }, 500); } return; }
             if (Math.hypot(px, pz + 6.15) < 2.35) {
                 if (isChamp) { drawBoard(); flash(); zap(); setTimeout(() => { level = 2; px = -14.6; pz = 3; yaw = Math.PI / 2; setStatus("Welcome, Champion. 👑"); }, 500); }
-                else { punish(); setStatus("The gate's eye narrows. Only three-time champions may pass.", true); } return;
+                else { punish(); setStatus("The gate's eye narrows. Only one-time champions may pass.", true); } return;
             }
             if (Math.hypot(px - 11.7, pz - 5.5) < 2) {
                 if (stage < 1) { setStatus("The keypad is dead…", true); return; } if (doorOpen) return;
@@ -1731,7 +1731,7 @@
         function upTick(now, dt) {
             if (!fin_) fin();
             const si = mySeat < 0 ? stairInfo(px, pz) : null;
-            const hasThreeWins = computeState(ownStats.rolls).wins >= 3;
+            const hasThreeWins = computeState(ownStats.rolls).wins >= 1;
             if (si && level !== 2 && hasThreeWins) { if (si.th < .25) level = 0; else if (si.th > ST.T - .1) level = 1; }
             const T = si ? stepTop(Math.max(0, si.th)) : level === 2 ? UY : level * UY; py += (T - py) * Math.min(1, dt * 12);
             upK = Math.min(1, Math.max(0, (py - 1.5) / 2.5));
@@ -1762,7 +1762,7 @@
             fireGlow.material.opacity = (.11 + .055 * Math.sin(t * 10) * Math.sin(t * 6)) * (1 - .92 * upK);
             fireGlow.scale.set(1 + Math.sin(t * 5) * .07, 1 + Math.sin(t * 8) * .08, 1);
             fireL.intensity = fireL.userData.i0 * (1 - .92 * upK) * (.78 + .22 * Math.sin(t * 11) * Math.sin(t * 7));
-            if (now - champT > 250) { champT = now; isChamp = computeState(ownStats.rolls).wins >= 3; }
+            if (now - champT > 250) { champT = now; isChamp = computeState(ownStats.rolls).wins >= 1; }
             { const ek = .45 * (1 - .9 * upK); if (Math.abs(ek - lastEk) > .005) { lastEk = ek; envMats.forEach(m => m.envMapIntensity = ek); } }
             ul.forEach((l, i) => l.intensity = l.userData.i0 * upK * (i === 2 ? fl : (off ? 0 : 1 + Math.sin(t * 9 + i) * .12)));
             hemi.intensity = 1.15 - upK; scene.fog.near = 24 - 21 * upK; scene.fog.far = 55 - 30 * upK; scene.fog.color.copy(C1).lerp(C2, upK); scene.background.copy(scene.fog.color);
@@ -2517,7 +2517,7 @@ function makeAvatar(name, id, gd) {
             );
             if (!doorway) return false;
 
-            const hasThreeWins = computeState(ownStats.rolls).wins >= 3;
+            const hasThreeWins = computeState(ownStats.rolls).wins >= 1;
             return hasThreeWins && doorway.open;
         }
 
@@ -2525,7 +2525,7 @@ function makeAvatar(name, id, gd) {
             if (level === 2) { if (x < -26.6 || x > -13.4 || z < -6.6 || z > 6.6) return true; } else if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > BOUNDS.z1) return true;
             const si = stairInfo(x, z);
             // Keep the physical doorway sealed until the three-win requirement is met.
-            const hasThreeWins = computeState(ownStats.rolls).wins >= 3;
+            const hasThreeWins = computeState(ownStats.rolls).wins >= 1;
             if (stairDoors.some(d => Math.abs(x - d.x) < 1.52 && Math.abs(z - d.z) < .48 && (!hasThreeWins || !d.open))) return true;
             if (si && (Math.abs(si.r - ST.R - ST.hw) < .22 || Math.abs(si.r - ST.R + ST.hw) < .22 || (level === 1 && si.th < .12))) return true;
             for (const s of solids) if ((s.lv || 0) === level && Math.hypot(x - s.x, z - s.z) < s.r + .25) return true;
