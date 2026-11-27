@@ -1380,6 +1380,75 @@ My Books</b><button class="xx" data-close>✕</button></div>
             saveRemoteProfiles(); renderLeaderboard();
         }
 
+        /* ================= PROGRESS RECOVERY (restore lost progress from online members) ================= */
+        /* If this browser has no study / dice data for the account (new browser, cleared storage…),
+           ask the members who are online – one by one – for the copy of our profile that they cached.
+           A member who never saw us answers "not found" and we simply move on to the next member.
+           We keep going until everybody currently online has answered (new arrivals are asked too).
+           If nobody has anything (or everything is 0) the account is treated as newly registered. */
+        const REC = { timer: null, done: false, peers: new Map(), found: false, foundAt: 0, sources: [], lastMsg: "" };
+        const needsRecovery = () => totalSecs(ownStats.days) === 0 && ownStats.rolls.length === 0;
+        const recMsg = m => { if (REC.lastMsg === m) return; REC.lastMsg = m; setStatus(m); };
+        function sanitizeProfile(data) {
+            if (!data || typeof data !== "object") return null;
+            const limit = tehranDate(new Date(Date.now() + 86400000)), days = {};
+            for (const [d, s] of Object.entries(data.days || {})) {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || d > limit) continue;
+                const v = Math.floor(Number(s)); if (!Number.isFinite(v) || v <= 0) continue;
+                days[d] = Math.min(v, 86400);
+            }
+            const rolls = mergeRolls(data.rolls, []);
+            if (totalSecs(days) === 0 && rolls.length === 0) return null;
+            return { days, rolls };
+        }
+        function startRecovery() {
+            if (REC.timer || REC.done || !needsRecovery()) return;
+            REC.peers.clear(); REC.found = false; REC.sources = []; REC.lastMsg = "";
+            recMsg("Looking for your saved progress among online members…");
+            REC.timer = setInterval(recoveryTick, 1000); recoveryTick();
+        }
+        function stopRecovery() { clearInterval(REC.timer); REC.timer = null; }
+        function recoveryTick() {
+            if (!REC.timer || !joined) return;
+            const now = Date.now();
+            if (REC.found) { if (now - REC.foundAt > 4000) { REC.done = true; stopRecovery(); } return; } /* short grace period for replies already on the way */
+            let pending = 0, total = 0;
+            remoteMembers.forEach(m => {
+                const pid = m.peerId; if (!pid || pid === myId) return;
+                total++;
+                let e = REC.peers.get(pid);
+                if (!e) { e = { state: "wait", since: now }; REC.peers.set(pid, e); }
+                if (e.state === "wait") {
+                    const c = dataConns.get(pid);
+                    if (c?.open) { try { c.send({ t: "rq", userId }); e.state = "sent"; e.since = now; } catch { } }
+                    else if (now - e.since > 6000) { connectData(pid); if (now - e.since > 25000) e.state = "done"; } /* unreachable member → skip */
+                } else if (e.state === "sent" && now - e.since > 8000) e.state = "done"; /* no answer → skip */
+                if (e.state !== "done") pending++;
+            });
+            if (pending > 0) { recMsg("Looking for your saved progress among online members…"); return; }
+            if (!needsRecovery()) { stopRecovery(); return; } /* user already has fresh local data and everybody was asked */
+            recMsg(total ? "No saved progress found on any online member — looks like a new account." : "Nobody else is online yet — I'll look for your progress as soon as someone joins.");
+        }
+        function onRecoveryReply(id, d) {
+            const e = REC.peers.get(id); if (!e || !REC.timer || d.userId !== userId) return;
+            e.state = "done";
+            const clean = d.found ? sanitizeProfile(d.data) : null;
+            if (clean) {
+                ownStats.days = mergeDays(ownStats.days, clean.days); ownStats.rolls = mergeRolls(ownStats.rolls, clean.rolls);
+                REC.sources.push(findMemberByPeer(id)?.name || "another member");
+                if (!REC.found) { REC.found = true; REC.foundAt = Date.now(); }
+                saveOwnStats(); $("studyTimer").textContent = formatTime(totalSecs(ownStats.days)); renderLeaderboard(); sendMyProfile();
+                recMsg(`Progress restored from ${REC.sources[0]} · ${formatTime(totalSecs(ownStats.days))} studied · ${ownStats.rolls.length} dice rolled`);
+            }
+            recoveryTick();
+        }
+        function answerRecovery(c, d) {
+            if (!joined || typeof d.userId !== "string" || !/^[0-9a-f]{64}$/.test(d.userId)) return;
+            const now = Date.now(); if (now - (c._rq || 0) < 1500) return; c._rq = now;
+            const clean = sanitizeProfile(d.userId === userId ? ownStats : remoteProfiles.get(d.userId)?.data);
+            try { c.send({ t: "rs", userId: d.userId, found: !!clean, data: clean ? { version: 1, days: clean.days, rolls: clean.rolls } : null }); } catch { }
+        }
+
         /* ================= THREE.JS WORLD — LIBRARY ================= */
         const canvas = $("c3d");
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance", stencil: false, depth: true });
@@ -3039,8 +3108,8 @@ const SKIN_BUMP = ctex(cvs(512, 512, c => {
         }
         function setupData(c) {
             const id = c.peer;
-            c.on("open", () => { dataConns.set(id, c); sendState(c); });
-            c.on("data", d => { if (d?.t === "p") onState(id, d); });
+            c.on("open", () => { dataConns.set(id, c); sendState(c); if (REC.timer) setTimeout(recoveryTick, 0); });
+            c.on("data", d => { if (d?.t === "p") onState(id, d); else if (d?.t === "rq") answerRecovery(c, d); else if (d?.t === "rs") onRecoveryReply(id, d); });
             const gone = () => { if (dataConns.get(id) === c) dataConns.delete(id); };
             c.on("close", gone); c.on("error", gone);
         }
@@ -3519,7 +3588,7 @@ const SKIN_BUMP = ctex(cvs(512, 512, c => {
             try {
                 sessionStorage.setItem("fh_skip", "1");
                 if (isStudying) stopStudy(); if (isScreenSharing) stopScreenSharing(); if (isCamOn) await stopCamera();
-                saveOwnStats(); socket?.disconnect(); if (peer && !peer.destroyed) peer.destroy();
+                stopRecovery(); saveOwnStats(); socket?.disconnect(); if (peer && !peer.destroyed) peer.destroy();
             } catch (e) { console.warn(e); }
             location.reload();
         });
@@ -3588,7 +3657,7 @@ const SKIN_BUMP = ctex(cvs(512, 512, c => {
                     $("joinScreen").style.display = "none"; $("roomScreen").classList.add("active");
                     $("studyTimer").textContent = formatTime(totalSecs(ownStats.days));
                     joined = true; px = (Math.random() - .5) * 10; pz = 11.5; setView("room");
-                    setupSocket(); renderLeaderboard(); updateStudyUI(); updateButtons();
+                    setupSocket(); renderLeaderboard(); updateStudyUI(); updateButtons(); startRecovery();
                     setStatus("Connected. Walk to a free chair and press E to sit.");
                 });
                 peer.on("call", handleIncoming);
