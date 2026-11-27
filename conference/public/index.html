@@ -1127,6 +1127,22 @@
             background: linear-gradient(115deg, #f3d398, #d9a04a);
             color: #1d1307
         }
+
+        /* exam + books panels */
+        .xpanel{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:70;width:min(380px,92vw);padding:20px;border-radius:22px}
+        .xpanel[hidden],#examHud[hidden]{display:none!important}
+        .xh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:15px}
+        .xx{background:none;border:0;color:var(--mu);font-size:18px;cursor:pointer}
+        .xs{color:var(--mu);font-size:12px;line-height:1.6;margin:6px 0}
+        .xbig{font:800 46px/1.1 "Courier New",monospace;text-align:center;color:#ffb04a;text-shadow:0 0 18px rgba(255,138,42,.55);margin:6px 0 10px}
+        .xbar{height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;margin-bottom:8px}.xbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#f3d398,#d9a04a);transition:width .3s}
+        .xrow{display:flex;gap:8px;align-items:center;margin-top:10px}.xrow .btn{padding:12px}.btn.ghost{background:rgba(255,255,255,.08);color:var(--tx);box-shadow:none}
+        .xrow input[type=number],.xf input[type=text]{flex:1;padding:12px 14px;background:rgba(255,255,255,.06);border:1px solid var(--bd);border-radius:12px;outline:none}
+        #examPre button{flex:1;padding:8px 0;border-radius:10px;border:1px solid var(--bd);background:rgba(255,255,255,.05);cursor:pointer}#examPre button:hover{border-color:var(--gold)}
+        #examHud{position:fixed;top:78px;right:16px;z-index:60;padding:8px 14px;border-radius:14px;font-weight:800;color:#ffb04a}
+        .brow{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd)}.brow i{width:10px;height:26px;border-radius:3px}.brow span{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .brow button{padding:6px 10px;border-radius:9px;border:1px solid var(--bd);background:rgba(255,255,255,.06);cursor:pointer;font-size:12px}
+        .xf{display:flex;flex-direction:column;gap:8px;margin-top:12px}.xfile{padding:12px 14px;border:1px dashed var(--gold);border-radius:12px;cursor:pointer;font-size:13px;color:var(--gold);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     </style>
 </head>
 
@@ -1238,6 +1254,8 @@
                         d="M3 16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z" />
                     <path d="M5 18v2M19 18v2" />
                 </svg><span id="seatText">Sit</span></button>
+            <button class="dk" id="examBtn" style="display:none"><svg viewBox="0 0 24 24"><path d="M9 2h6M12 2v3" /><circle cx="12" cy="14" r="8" /><path d="M12 10v4l3 2" /></svg><span>Exam</span></button>
+            <button class="dk" id="bookBtn" style="display:none"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z" /><path d="M4 19.5V21h16" /></svg><span>Books</span></button>
             <div class="reaction-wrap">
                 <button class="dk" id="reactionToggle"><svg viewBox="0 0 24 24">
                         <path d="M22 11v1a10 10 0 1 1-9-10" />
@@ -1255,6 +1273,27 @@
                 </svg><span>Leave</span></button>
         </nav>
         <div id="reactionLayer" aria-live="polite"></div>
+        <div id="examPanel" class="xpanel glass" hidden>
+            <div class="xh"><b>📝 Exam Hall</b><button class="xx" data-close>✕</button></div>
+            <div class="xbig" id="examBig">00:00:00</div><div class="xbar"><i id="examBar"></i></div>
+            <div class="xs" id="examState"></div>
+            <div class="xrow"><input id="examMin" type="number" min="1" max="600" value="60"><span class="xs">minutes</span></div>
+            <div class="xrow" id="examPre"><button data-m="15">15</button><button data-m="30">30</button><button data-m="60">60</button><button data-m="90">90</button><button data-m="120">120</button></div>
+            <div class="xrow"><button class="btn" id="examStart">Start exam</button><button class="btn ghost" id="examStop">Cancel</button></div>
+        </div>
+        <div id="examHud" class="glass" hidden>⏱ <span id="examHudT">00:00:00</span></div>
+        <div id="bookPanel" class="xpanel glass" hidden>
+            <div class="xh"><b><svg style="width: 6px;" class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
+  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v13H7a2 2 0 0 0-2 2Zm0 0a2 2 0 0 0 2 2h12M9 3v14m7 0v4"/>
+</svg>
+My Books</b><button class="xx" data-close>✕</button></div>
+            <div class="xs">PDFs are never uploaded — they open straight from your own device.</div>
+            <div id="bookList"></div>
+            <div class="xf"><input id="bookTitle" type="text" maxlength="40" placeholder="Book name">
+                <label class="xfile"><input id="bookFile" type="file" accept="application/pdf,.pdf" hidden><span id="bookFileName">Choose PDF from device…</span></label>
+                <button class="btn" id="bookAdd">Add to shelf</button></div>
+        </div>
+
     </div>
 
     <script type="module">
@@ -1345,7 +1384,7 @@
         const canvas = $("c3d");
         const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance", stencil: false, depth: true });
         // Keep GPU cost predictable on laptops and integrated graphics.
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.08;
         // The scene uses layered materials, emissive details and rugs for depth; realtime
         // shadow maps were the largest recurring GPU cost, so they are intentionally off.
@@ -1361,12 +1400,23 @@
         { const c = moon.shadow.camera; c.left = -15; c.right = 15; c.top = 15; c.bottom = -15; c.near = 1; c.far = 60; } moon.shadow.bias = -.0004; moon.shadow.normalBias = .03; moon.shadow.mapSize.set(2048, 2048); moon.shadow.radius = 4;
         moon.target.position.set(0, 0, 6); scene.add(moon.target); scene.add(moon);
 
-        const envMats = []; const mat = (c, o = {}) => { const m = new THREE.MeshStandardMaterial({ color: c, roughness: .66, envMap: ENV, envMapIntensity: .45, ...o }); envMats.push(m); return m; };
-        function box(w, h, d, c, x, y, z, parent = scene) { const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 4, Math.min(.03, Math.min(w, h, d) / 2.2)), mat(c)); m.position.set(x, y, z); parent.add(m); return m; }
+        const envMats = []; const mat = (c, o = {}) => { const m = new THREE.MeshStandardMaterial({ color: c, roughness: .66, envMap: ENV, envMapIntensity: .45, bumpMap: GRAIN, bumpScale: .35, ...o }); envMats.push(m); return m; };
+        function box(w, h, d, c, x, y, z, parent = scene) { const m = new THREE.Mesh(triUV(new RoundedBoxGeometry(w, h, d, 4, Math.min(.03, Math.min(w, h, d) / 2.2)), 2.5), mat(c)); m.position.set(x, y, z); parent.add(m); return m; }
         function cyl(rt, rb, h, c, x, y, z, parent = scene, o = {}) { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 56), mat(c, o)); m.position.set(x, y, z); parent.add(m); return m; }
         function cu(w, h, d, c, x, y, z, p) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color: c, roughness: .65 })); m.position.set(x, y, z); p.add(m); return m; }
         const cvs = (w, h, fn) => { const c = document.createElement("canvas"); c.width = w; c.height = h; fn(c.getContext("2d"), w, h); return c; };
         const ctex = (c, rx = 1, ry = 1) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy()); return t; };
+
+        /* ---- detail helpers: triplanar UVs, wood grain, woven upholstery ---- */
+        const triUV = (g, k = 3) => { const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) { const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i)); let u, v; if (ay >= ax && ay >= az) { u = p.getX(i); v = p.getZ(i); } else if (ax >= az) { u = p.getZ(i); v = p.getY(i); } else { u = p.getX(i); v = p.getY(i); } uv.setXY(i, u * k, v * k); } uv.needsUpdate = true; return g; };
+        const GRAIN = ctex(cvs(256, 256, (c, w, h) => { c.fillStyle = "#8a8a8a"; c.fillRect(0, 0, w, h); for (let i = 0; i < 700; i++) { const v = 100 + Math.random() * 70 | 0; c.strokeStyle = `rgba(${v},${v},${v},.4)`; c.lineWidth = .5 + Math.random() * 1.3; const y = Math.random() * h; c.beginPath(); c.moveTo(0, y); c.bezierCurveTo(w * .3, y + Math.random() * 5 - 2.5, w * .7, y + Math.random() * 5 - 2.5, w, y + Math.random() * 3 - 1.5); c.stroke(); } }));
+        const weave = (lo, hi) => ctex(cvs(128, 128, (c) => { for (let y = 0; y < 16; y++)for (let x = 0; x < 16; x++) { const o = (x + y) & 1; c.fillStyle = o ? hi : lo; c.fillRect(x * 8, y * 8, 8, 8); c.fillStyle = o ? "rgba(0,0,0,.28)" : "rgba(255,255,255,.3)"; o ? c.fillRect(x * 8 + 5, y * 8, 3, 8) : c.fillRect(x * 8, y * 8 + 2, 8, 3); c.fillStyle = "rgba(0,0,0,.18)"; c.fillRect(x * 8, y * 8 + 7, 8, 1); } }));
+        const WV_B = weave("#707070", "#c8c8c8"), WV_C = weave("#d9d9d9", "#ffffff");
+        const fabM = {};
+        const fab = col => fabM[col] || (fabM[col] = new THREE.MeshPhysicalMaterial({ color: col, map: WV_C, bumpMap: WV_B, bumpScale: 2, roughness: .92, sheen: 1, sheenRoughness: .55, sheenColor: new THREE.Color(col).offsetHSL(0, -.1, .25), envMap: ENV, envMapIntensity: .2 }));
+        const fbox = (w, h, d, col, x, y, z, p, r = .05, own = false) => { const m = new THREE.Mesh(triUV(new RoundedBoxGeometry(w, h, d, 4, Math.min(r, Math.min(w, h, d) / 2.2)), 8), fab(col)); if (own) m.material = m.material.clone(); m.position.set(x, y, z); p.add(m); return m; };
+        const BTN_G = new THREE.SphereGeometry(.017, 10, 8), BTN_M = new THREE.MeshStandardMaterial({ color: 0xd8b45a, metalness: .9, roughness: .25, envMap: ENV });
+        function tuft(p, x0, y0, z, nx, ny, dx, dy) { for (let j = 0; j < ny; j++)for (let i = 0; i < nx; i++) { const b = new THREE.Mesh(BTN_G, BTN_M); b.position.set(x0 + i * dx + (j & 1 ? dx / 2 : 0), y0 + j * dy, z); b.scale.z = .6; p.add(b); } }
         const BOUNDS = { x0: -11.2, x1: 11.2, z0: -7.55, z1: 12.2 };
         const solids = [], chairs = [];
         const solid = (x, z, r, lv = 0) => solids.push({ x, z, r, lv });
@@ -1409,8 +1459,8 @@
             const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: ctex(cv, w / 1.6, h / 1.6), bumpMap: ctex(cv, w / 1.6, h / 1.6), bumpScale: 1.2, roughness: .85 }));
             m.position.set(x, y, z); m.rotation.y = ry; m.userData.ns = 1; scene.add(m); return m;
         }
-        { const d = damaskCv(300, 28, 24); wallPlane(24, 4.6, 0, 2.3, -7.84, 0, d); wallPlane(24, 4.6, 0, 2.3, 18.84, Math.PI, d); wallPlane(27, 4.6, -11.84, 2.3, 5.5, Math.PI / 2, d); wallPlane(27, 4.6, 11.84, 2.3, 5.5, -Math.PI / 2, d); }
-        box(24, 4.6, .3, WALL, 0, 2.3, -8); box(24, 4.6, .3, WALL, 0, 2.3, 19); box(.3, 4.6, 27, WALL, -12, 2.3, 5.5); box(.3, 4.6, 27, WALL, 12, 2.3, 5.5);
+        { const d = damaskCv(300, 28, 24); wallPlane(24, 4.6, 0, 2.3, -7.84, 0, d); wallPlane(24, 4.6, 0, 2.3, 18.84, Math.PI, d); wallPlane(27, 4.6, -11.84, 2.3, 5.5, Math.PI / 2, d); wallPlane(20.4, 4.6, 11.84, 2.3, 2.2, -Math.PI / 2, d); wallPlane(4.4, 4.6, 11.84, 2.3, 16.8, -Math.PI / 2, d); wallPlane(2.2, 1.5, 11.84, 3.85, 13.5, -Math.PI / 2, d); }
+        box(24, 4.6, .3, WALL, 0, 2.3, -8); box(24, 4.6, .3, WALL, 0, 2.3, 19); box(.3, 4.6, 27, WALL, -12, 2.3, 5.5); box(.3, 4.6, 20.4, WALL, 12, 2.3, 2.2); box(.3, 4.6, 4.4, WALL, 12, 2.3, 16.8); box(.3, 1.5, 2.2, WALL, 12, 3.85, 13.5);
         let upK = 0, gl = null, ul = [], upAud = null, doorOpen = false, ghost = null, ghostT = 4, ghostLife = 0, offUntil = 0, fin_ = false, stage = 0, keyLed = null, gate = null, crown = null, boardCv = null, boardTex = null, champT = 0, isChamp = false, lastEk = -1, portals = [], piano = null, dolls = [], tvTex = null, tvT = 0, tpCool = 0, seq = [], statue = null, eyeM = null, doorMesh = null, orb = null, strangeProps = [], stairDoors = [];
         const UY = 4.7, ORDER = [0, 2, 3, 1], pupils = [], candles = [], hang = [], books = [], gems = [], peds = [], C1 = new THREE.Color(0x120d12), C2 = new THREE.Color(0x040806), _v = new THREE.Vector3();
         const ST = { R: 3.4, hw: .85, T: Math.PI / 2, N: 22, cz: -3.2, cx: 7.2 };
@@ -1562,7 +1612,7 @@
             ["☾", "☀", "★", "◉"].forEach((r, i) => {
                 const [x, z] = [[-10, 10.5], [10, 10.5], [-10, 1.5], [10, -.8]][i]; cyl(.28, .34, .9, 0x2a2a30, x, Y + .45, z); cyl(.34, .34, .06, 0x15151a, x, Y + .93, z);
                 P(.5, .5, cvs(128, 128, c => { c.fillStyle = "#8a7aff"; c.font = "90px serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(r, 64, 70); }), x, Y + .97, z, 0, -Math.PI / 2);
-                const gm = new THREE.Mesh(new THREE.SphereGeometry(.09, 16, 12), new THREE.MeshBasicMaterial({ color: 0x332244 })); gm.position.set(x, Y + 1.25, z); scene.add(gm); gems.push(gm); peds.push([x, z]);
+                const gm = new THREE.Mesh(new THREE.SphereGeometry(.09, 16, 12), new THREE.MeshBasicMaterial({ color: 0x332244 })); gm.position.set(x, Y + 1.05, z); scene.add(gm); gems.push(gm); peds.push([x, z]);
             });
             doorMesh = box(.14, 2.8, 1.6, 0x2a0f12, 11.7, Y + 1.4, 4);
             P(1.6, 2.8, cvs(160, 280, (c, w, h) => { const g = c.createRadialGradient(80, 140, 5, 80, 140, 160); g.addColorStop(0, "#ffe9a8"); g.addColorStop(1, "#5a2a08"); c.fillStyle = g; c.fillRect(0, 0, w, h); c.fillStyle = "#2a1306"; c.textAlign = "center"; c.font = "700 18px Georgia,serif";["YOU STAYED.", "THE HOUSE", "REMEMBERS.", "", "★ SECRET ★", "FOUND ★"].forEach((t, i) => c.fillText(t, 80, 80 + i * 24)); }), 11.84, Y + 1.4, 4, -Math.PI / 2);
@@ -1984,7 +2034,7 @@ const BOOK_TITLES = [
             box(W + .12, .1, D + .06, 0x4a2f1d, 0, H + .05, 0, g);
         }
         for (let x = -9.6; x <= 9.7; x += 2.4) shelf(x, 18.62, Math.PI);
-        for (const z of [-5.6, -3.2, -.8, 1.6, 4, 6.4, 8.8, 11.2, 13.6, 15.9, 18.0]) { shelf(-11.62, z, Math.PI / 2); shelf(11.62, z, -Math.PI / 2); }
+        for (const z of [-5.6, -3.2, -.8, 1.6, 4, 6.4, 8.8, 11.2, 13.6, 15.9, 18.0]) { if (z !== 13.6) { shelf(-11.62, z, Math.PI / 2); shelf(11.62, z, -Math.PI / 2); } }
         tileAttr.needsUpdate = true; bookMesh.count = bookN; bookMesh.instanceMatrix.needsUpdate = true; if (bookMesh.instanceColor) bookMesh.instanceColor.needsUpdate = true;
 
         /* rug + seats */
@@ -2003,23 +2053,47 @@ const BOOK_TITLES = [
         }
         function diningChair(x, z, ry) {
             const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; scene.add(g);
-            [[-.22, -.22], [.22, -.22], [-.22, .22], [.22, .22]].forEach(([a, b]) => box(.05, .45, .05, 0x3a2314, a, .22, b, g));
-            box(.56, .05, .56, 0x4a2e1c, 0, .45, 0, g); const m = cu(.5, .08, .5, 0x7a2f3a, 0, .5, 0, g);
-            box(.56, .6, .05, 0x4a2e1c, 0, .85, .27, g); box(.4, .35, .04, 0x7a2f3a, 0, .85, .24, g);
+            [[-.22, -.22], [.22, -.22], [-.22, .22], [.22, .22]].forEach(([a, b]) => { cyl(.03, .02, .45, 0x3a2314, a, .225, b, g); cyl(.036, .036, .03, 0xc9a24a, a, .03, b, g, { metalness: .8, roughness: .3 }); });
+            box(.5, .03, .03, 0x3a2314, 0, .18, -.22, g); box(.5, .03, .03, 0x3a2314, 0, .18, .22, g); box(.03, .03, .44, 0x3a2314, -.22, .18, 0, g); box(.03, .03, .44, 0x3a2314, .22, .18, 0, g);
+            box(.56, .05, .56, 0x4a2e1c, 0, .45, 0, g);
+            const m = fbox(.5, .09, .5, 0x7a2f3a, 0, .52, 0, g, .045, true);
+            // Seat studs must be distributed across the horizontal X/Z plane.
+            // The generic tuft() helper offsets rows vertically, which made two studs float.
+            [-.15, .15].forEach(sx => [-.15, .15].forEach(sz => {
+                const stud = new THREE.Mesh(BTN_G, BTN_M);
+                stud.position.set(sx, .568, sz);
+                stud.scale.z = .6;
+                g.add(stud);
+            }));
+            [-.25, .25].forEach(a => box(.05, .62, .05, 0x4a2e1c, a, .78, .27, g)); box(.56, .07, .05, 0x4a2e1c, 0, 1.1, .27, g);
+            fbox(.4, .4, .07, 0x7a2f3a, 0, .84, .23, g, .03); tuft(g, -.1, .84, .27, 2, 2, .2, .14);
             addSeat(g, 0, 0, 0, m);
         }
         function armchair(g, lx, lz, lry, col) {
             const a = new THREE.Group(); a.position.set(lx, 0, lz); a.rotation.y = lry; g.add(a);
-            box(.95, .3, .95, col, 0, .3, 0, a); box(.95, .78, .22, col, 0, .78, .38, a); box(.2, .52, .8, col, -.38, .52, -.02, a); box(.2, .52, .8, col, .38, .52, -.02, a);
-            [[-.4, -.4], [.4, -.4], [-.4, .4], [.4, .4]].forEach(([x, z]) => box(.06, .12, .06, 0x2a1a10, x, .06, z, a));
-            const m = cu(.58, .14, .7, col + 0x111111, 0, .52, .02, a); addSeat(g, lx, lz, lry, m);
+            box(.95, .12, .95, 0x2a1a10, 0, .18, 0, a); fbox(.95, .26, .95, col, 0, .31, 0, a, .06);
+            fbox(.95, .8, .22, col, 0, .8, .38, a, .09); tuft(a, -.3, .72, .265, 3, 3, .3, .17);
+            [-1, 1].forEach(s => {
+                fbox(.2, .46, .82, col, s * .38, .5, -.02, a, .06);
+                const r = new THREE.Mesh(new THREE.CylinderGeometry(.11, .11, .82, 20), fab(col)); r.rotation.x = Math.PI / 2; r.position.set(s * .38, .76, -.02); a.add(r);
+                for (let k = 0; k < 4; k++) { const n = new THREE.Mesh(BTN_G, BTN_M); n.position.set(s * .485, .4, -.3 + k * .14); a.add(n); }
+            });
+            [[-.4, -.4], [.4, -.4], [-.4, .4], [.4, .4]].forEach(([x, z]) => cyl(.035, .025, .14, 0x2a1a10, x, .07, z, a));
+            const m = fbox(.58, .16, .7, col + 0x111111, 0, .54, .02, a, .07, true); const cs = fbox(.42, .32, .1, col + 0x181818, 0, .8, .26, a, .08); cs.rotation.x = -.2;
+            addSeat(g, lx, lz, lry, m);
         }
         function sofa(g, lz, col) {
             const a = new THREE.Group(); a.position.set(0, 0, lz); g.add(a);
-            box(2.4, .32, .95, col, 0, .3, 0, a); box(2.4, .82, .22, col, 0, .78, .38, a); box(.22, .58, .95, col, -1.1, .5, 0, a); box(.22, .58, .95, col, 1.1, .5, 0, a);
-            [[-1.1, -.4], [1.1, -.4], [-1.1, .4], [1.1, .4]].forEach(([x, z]) => box(.07, .12, .07, 0x2a1a10, x, .06, z, a));
-            [-.58, .58].forEach(x => { const m = cu(1.05, .14, .7, col + 0x141414, x, .52, .04, a); addSeat(g, x, lz, 0, m); });
-            const pl = cu(.4, .35, .12, 0xe9bf7c, -.9, .85, .12, a); pl.rotation.z = .25; const p2 = cu(.4, .35, .12, 0x13a89e, .9, .85, .12, a); p2.rotation.z = -.25;
+            box(2.4, .12, .95, 0x2a1a10, 0, .18, 0, a); fbox(2.4, .26, .95, col, 0, .31, 0, a, .06);
+            fbox(2.4, .84, .22, col, 0, .8, .38, a, .09); tuft(a, -.95, .72, .265, 5, 3, .4, .2);
+            [-1, 1].forEach(s => {
+                fbox(.22, .5, .95, col, s * 1.1, .5, 0, a, .06);
+                const r = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, .95, 20), fab(col)); r.rotation.x = Math.PI / 2; r.position.set(s * 1.1, .78, 0); a.add(r);
+                for (let k = 0; k < 5; k++) { const n = new THREE.Mesh(BTN_G, BTN_M); n.position.set(s * 1.215, .4, -.36 + k * .17); a.add(n); }
+            });
+            [[-1.1, -.4], [1.1, -.4], [-1.1, .4], [1.1, .4]].forEach(([x, z]) => cyl(.04, .028, .14, 0x2a1a10, x, .07, z, a));
+            [-.58, .58].forEach(x => { const m = fbox(1.05, .16, .7, col + 0x141414, x, .54, .04, a, .075, true); addSeat(g, x, lz, 0, m); fbox(1.0, .4, .13, col + 0x101010, x, .78, .24, a, .07); });
+            const pl = fbox(.4, .36, .13, 0xe9bf7c, -.9, .85, .1, a, .08); pl.rotation.set(0, .1, .25); const p2 = fbox(.4, .36, .13, 0x13a89e, .9, .85, .1, a, .08); p2.rotation.set(0, -.1, -.25);
             solid(g.position.x + (lz * Math.sin(g.rotation.y)) + 1.1 * Math.cos(g.rotation.y), g.position.z + lz * Math.cos(g.rotation.y) - 1.1 * Math.sin(g.rotation.y), .45);
             solid(g.position.x + (lz * Math.sin(g.rotation.y)) - 1.1 * Math.cos(g.rotation.y), g.position.z + lz * Math.cos(g.rotation.y) + 1.1 * Math.sin(g.rotation.y), .45);
         }
@@ -2226,9 +2300,279 @@ const BOOK_TITLES = [
             const r3 = new THREE.Mesh(new THREE.TorusGeometry(1.2, .04, 8, 40), mat(0xc9a24a, { metalness: .7, roughness: .3 })); r3.rotation.x = Math.PI / 2; r3.position.y = .25; ch.add(r3);
             for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5; const b = new THREE.Mesh(new THREE.SphereGeometry(.09, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfff1cf, emissive: 0xffd28a, emissiveIntensity: 2 })); b.position.set(Math.sin(a) * 2.0, .1, Math.cos(a) * 2.0); ch.add(b); }
             [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([a, b]) => { const c = cyl(.015, .015, 1.1, 0xc9a24a, a * 1.4, .6, b * 1.4, ch); });
-            const cl = new THREE.PointLight(0xffd6a0, 30, 20, 2); cl.position.set(0, -.2, 0); ch.add(cl);
+            const cl = new THREE.PointLight(0xffd6a0, 14, 16, 2); cl.position.set(0, -.2, 0); ch.add(cl);
         }
         buildTree(-9.5, -6.5, 2.9, 7); buildTree(-3.5, -6.6, 2.5, 19, .72); buildTree(3.5, -6.6, 2.5, 31, .72); buildTree(9.5, -6.5, 2.9, 43);
+
+        /* ================= EXAM HALL (east annex) + PERSONAL BOOKSHELF ================= */
+        const EX = { x0: 12.3, x1: 38.5, z0: 3.6, z1: 18.7, H: 4.6 }; EX.cx = (EX.x0 + EX.x1) / 2; EX.cz = (EX.z0 + EX.z1) / 2;
+        const inBounds = (x, z) => {
+            const lim = level === 1 ? BOUNDS.z1 : BOUNDS.z1 + 6;
+            if (x >= BOUNDS.x0 && x <= BOUNDS.x1 && z >= BOUNDS.z0 && z <= lim) return true;
+            if (level !== 0) return false;
+            return (x > BOUNDS.x1 && x <= 12.9 && Math.abs(z - 13.5) < .85) || (x > 12.9 && x <= 38.1 && z >= 4.1 && z <= 18.2);
+        };
+        const examG = new THREE.Group(); scene.add(examG);
+        const GC = {}, MC = {}, GOLD = { metalness: .75, roughness: .3 };
+        function sb(w, h, d, c, x, y, z, p = examG, o) { const k = w + "," + h + "," + d; const g = GC[k] || (GC[k] = triUV(new RoundedBoxGeometry(w, h, d, 2, Math.min(.02, Math.min(w, h, d) / 2.2)), 3)); const mk = c + JSON.stringify(o || 0); const m = new THREE.Mesh(g, MC[mk] || (MC[mk] = mat(c, o))); m.position.set(x, y, z); p.add(m); return m; }
+        function inst(w, h, d, c, pts, o) { const g = triUV(new RoundedBoxGeometry(w, h, d, 2, Math.min(.015, Math.min(w, h, d) / 2.2)), 3), im = new THREE.InstancedMesh(g, mat(c, o), pts.length), M = new THREE.Matrix4(); pts.forEach((p, i) => im.setMatrixAt(i, M.makeTranslation(p[0], p[1], p[2]))); im.instanceMatrix.needsUpdate = true; im.matrixAutoUpdate = false; examG.add(im); return im; }
+        const plate = (w, h, cw, ch, fn, x, y, z, ry, p = scene) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: ctex(cvs(cw, ch, fn)), roughness: .5, metalness: .1 })); m.position.set(x, y, z); m.rotation.y = ry; p.add(m); return m; };
+        const goldText = (t1, t2) => (c, w, h) => { const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, "#1c3a30"); g.addColorStop(1, "#0f211b"); c.fillStyle = g; c.fillRect(0, 0, w, h); c.strokeStyle = "#d8b45a"; c.lineWidth = 6; c.strokeRect(8, 8, w - 16, h - 16); c.lineWidth = 2; c.strokeRect(20, 20, w - 40, h - 40); c.fillStyle = "#f3d98e"; c.textAlign = "center"; c.font = "700 64px 'Playfair Display',Georgia,serif"; c.fillText(t1, w / 2, h / 2 - 6); c.font = "700 52px Tahoma,Arial,sans-serif"; c.fillText(t2, w / 2, h / 2 + 62); };
+        let signCtx = null, signTex = null, clockMin = null, clockHr = null, bellG = null, bellT = -1e9;
+        function drawSign(txt, mode) {
+            if (!signCtx) return; const c = signCtx, w = 512, h = 160;
+            c.fillStyle = "#070b09"; c.fillRect(0, 0, w, h); c.strokeStyle = "#d8b45a"; c.lineWidth = 5; c.strokeRect(5, 5, w - 10, h - 10);
+            c.textAlign = "center"; c.fillStyle = "rgba(255,255,255,.55)"; c.font = "600 20px Inter,Arial,sans-serif"; c.fillText(mode === 2 ? "TIME IS UP" : mode ? "TIME REMAINING" : "EXAM HALL", w / 2, 36);
+            c.shadowColor = mode === 2 ? "#ff2a2a" : "#ff8a2a"; c.shadowBlur = 22; c.fillStyle = mode === 2 ? "#ff5a4a" : "#ffb04a"; c.font = "800 84px 'Courier New',monospace"; c.fillText(txt, w / 2, 128); c.shadowBlur = 0; signTex.needsUpdate = true;
+        }
+        function buildExam() {
+            const { x0, x1, z0, z1, cx, H } = EX, W = x1 - x0, D = z1 - z0, cz = EX.cz;
+            /* marble floor, aisle runners, threshold */
+            const marble = cvs(512, 512, (c) => { for (let j = 0; j < 2; j++)for (let i = 0; i < 2; i++) { const d = (i + j) & 1; c.fillStyle = d ? "#2d3b37" : "#e9e0cb"; c.fillRect(i * 256, j * 256, 256, 256); for (let k = 0; k < 22; k++) { c.strokeStyle = d ? `rgba(190,210,200,${Math.random() * .15})` : `rgba(110,95,70,${Math.random() * .2})`; c.lineWidth = .5 + Math.random() * 1.5; c.beginPath(); let x = i * 256 + Math.random() * 256, y = j * 256; c.moveTo(x, y); for (let s = 0; s < 6; s++) { x += Math.random() * 40 - 20; y += 43; c.lineTo(x, y); } c.stroke(); } c.strokeStyle = "rgba(201,162,74,.8)"; c.lineWidth = 3; c.strokeRect(i * 256 + 1.5, j * 256 + 1.5, 253, 253); } });
+            const fl = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshPhysicalMaterial({ map: ctex(marble, W / 2.4, D / 2.4), roughness: .76, clearcoat: .12, clearcoatRoughness: .72, envMap: ENV, envMapIntensity: .16 })); fl.rotation.x = -Math.PI / 2; fl.position.set(cx, .001, cz); examG.add(fl);
+            const carpet = ctex(cvs(256, 512, (c, w, h) => { c.fillStyle = "#6e1624"; c.fillRect(0, 0, w, h); for (let i = 0; i < 4000; i++) { c.fillStyle = `rgba(${Math.random() < .5 ? "255,200,200" : "0,0,0"},.06)`; c.fillRect(Math.random() * w, Math.random() * h, 2, 2); } c.strokeStyle = "#d8b45a"; c.lineWidth = 6; c.strokeRect(10, 10, w - 20, h - 20); c.lineWidth = 2; c.strokeRect(24, 24, w - 48, h - 48); c.fillStyle = "#d8b45a"; for (let y = 60; y < h - 40; y += 48) { c.beginPath(); c.moveTo(w / 2, y - 14); c.lineTo(w / 2 + 14, y); c.lineTo(w / 2, y + 14); c.lineTo(w / 2 - 14, y); c.fill(); } }));
+            const cm = new THREE.MeshStandardMaterial({ map: carpet, roughness: 1, bumpMap: WV_B, bumpScale: .6 });
+            [-4, 4].forEach(o => { const r = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 11.4), cm); r.rotation.x = -Math.PI / 2; r.position.set(cx + o, .012, 12.3); examG.add(r); });
+            /* walls, wainscot, cornice, coffered ceiling, beams */
+            const d = damaskCv(150, 26, 17);
+            wallPlane(W, H, cx, H / 2, z0 + .01, 0, d); wallPlane(W, H, cx, H / 2, z1 - .01, Math.PI, d); wallPlane(D, H, x1 - .01, H / 2, cz, -Math.PI / 2, d);
+            wallPlane(8.8, H, x0 + .05, H / 2, 8, Math.PI / 2, d); wallPlane(4.1, H, x0 + .05, H / 2, 16.65, Math.PI / 2, d); wallPlane(2.2, 1.5, x0 + .05, 3.85, 13.5, Math.PI / 2, d);
+            const wain = (len, x, z, ry) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; examG.add(g); sb(len, 1.15, .07, 0x4a2f1d, 0, .575, .035, g); sb(len, .07, .11, 0xc9a24a, 0, 1.18, .055, g, GOLD); sb(len, .14, .1, 0x2a1a10, 0, .07, .05, g); for (let i = 0; i < Math.floor(len / 1.1); i++)sb(.96, .78, .02, 0x3a2415, -len / 2 + .55 + i * 1.1 + (len % 1.1) / 2, .6, .075, g); };
+            wain(W, cx, z0, 0); wain(W, cx, z1, Math.PI); wain(D, x1, cz, -Math.PI / 2); wain(8.8, x0, 8, Math.PI / 2); wain(4.1, x0, 16.65, Math.PI / 2);
+            sb(W, .18, .2, 0xc9a24a, cx, H - .09, z0 + .1, examG, GOLD); sb(W, .18, .2, 0xc9a24a, cx, H - .09, z1 - .1, examG, GOLD); sb(.2, .18, D, 0xc9a24a, x1 - .1, H - .09, cz, examG, GOLD); sb(.2, .18, D, 0xc9a24a, x0 + .1, H - .09, cz, examG, GOLD);
+            const ceilT = ctex(cvs(256, 256, (c, w, h) => { c.fillStyle = "#3a2416"; c.fillRect(0, 0, w, h); c.fillStyle = "#e4d6b8"; c.fillRect(18, 18, w - 36, h - 36); const g = c.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, 150); g.addColorStop(0, "rgba(255,255,255,.25)"); g.addColorStop(1, "rgba(0,0,0,.25)"); c.fillStyle = g; c.fillRect(18, 18, w - 36, h - 36); c.strokeStyle = "#c9a24a"; c.lineWidth = 3; c.strokeRect(18, 18, w - 36, h - 36); c.lineWidth = 1.5; c.strokeRect(30, 30, w - 60, h - 60); }), W / 2.2, D / 2.2);
+            const ce = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: ceilT, roughness: .85, emissive: 0x2a1f12, emissiveMap: ceilT, emissiveIntensity: .35 })); ce.rotation.x = Math.PI / 2; ce.position.set(cx, H - .02, cz); examG.add(ce);
+            for (let i = 1; i < 6; i++)sb(.32, .3, D, 0x3a2314, x0 + W * i / 6, H - .17, cz);
+            /* pilasters */
+            const pil = (x, z, ry) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; examG.add(g); sb(.55, .3, .22, 0x6b4630, 0, .15, .11, g); sb(.4, 3.75, .15, 0xe4d6b8, 0, 2.17, .075, g); [-.12, 0, .12].forEach(a => sb(.04, 3.6, .02, 0x9a8a68, a, 2.17, .16, g)); sb(.56, .28, .24, 0xc9a24a, 0, 4.2, .12, g, GOLD); };
+            for (let i = 0; i <= 5; i++)pil(x0 + W * i / 5, z1, Math.PI); [-5.2, 5.2].forEach(o => pil(cx + o, z0, 0));
+            /* moonlit arched windows + curtains + moon pools on the floor */
+            const skyT = ctex(cvs(128, 256, (c, w, h) => { c.beginPath(); c.moveTo(0, h); c.lineTo(0, 64); c.arc(64, 64, 64, Math.PI, 0); c.lineTo(w, h); c.closePath(); c.clip(); const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, "#0b1030"); g.addColorStop(.6, "#27346e"); g.addColorStop(1, "#5a6aa8"); c.fillStyle = g; c.fillRect(0, 0, w, h); for (let i = 0; i < 40; i++) { c.fillStyle = `rgba(255,255,255,${.3 + Math.random() * .6})`; c.fillRect(Math.random() * w, Math.random() * h * .7, 1.5, 1.5); } const m = c.createRadialGradient(88, 62, 2, 88, 62, 26); m.addColorStop(0, "#fffbe8"); m.addColorStop(.3, "#fff1c0"); m.addColorStop(1, "rgba(255,240,190,0)"); c.fillStyle = m; c.fillRect(40, 20, 100, 90); c.fillStyle = "rgba(10,14,30,.5)"; c.fillRect(0, 150, w, 106); c.fillStyle = "rgba(0,0,0,.35)"; [18, 60, 100].forEach(x => c.fillRect(x, 158, 28, 98)); }));
+            const pool = new THREE.CanvasTexture(cvs(64, 128, (c, w, h) => { const g = c.createRadialGradient(32, 64, 2, 32, 64, 62); g.addColorStop(0, "rgba(140,170,255,.7)"); g.addColorStop(1, "rgba(140,170,255,0)"); c.fillStyle = g; c.fillRect(0, 0, w, h); }));
+            const GM = mat(0xc9a24a, GOLD), curM = fab(0x6a1a2a);
+            for (let i = 0; i < 5; i++) {
+                const x = x0 + W * (i + .5) / 5, g = new THREE.Group(); g.position.set(x, 0, z1 - .05); g.rotation.y = Math.PI; examG.add(g);
+                { const wg = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 3), new THREE.MeshBasicMaterial({ map: skyT, transparent: true, alphaTest: .5 })); wg.position.set(0, 2.55, 0); g.add(wg); }
+                [-.79, .79].forEach(s => sb(.09, 2.25, .14, 0x5a3a24, s, 2.175, .02, g)); sb(1.9, .08, .3, 0x6b4630, 0, 1.01, .1, g); sb(1.5, .04, .05, 0x5a3a24, 0, 2.4, .02, g); sb(.04, 3, .05, 0x5a3a24, 0, 2.55, .02, g);
+                const ar = new THREE.Mesh(new THREE.TorusGeometry(.76, .05, 8, 28, Math.PI), GM); ar.position.set(0, 3.3, .02); g.add(ar);
+                sb(2.9, .04, .04, 0xc9a24a, 0, 4.25, .13, g, GOLD);
+                [-1.05, 1.05].forEach(s => { const cu_ = fbox(.42, 3.5, .16, 0x6a1a2a, s, 2.45, .13, g, .08); for (let k = 0; k < 4; k++)sb(.02, 3.4, .02, 0x4a0f1a, s - .15 + k * .1, 2.45, .22, g); sb(.12, .06, .2, 0xc9a24a, s, 1.5, .13, g, GOLD); });
+                const pm = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 3.6), new THREE.MeshBasicMaterial({ map: pool, transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false })); pm.rotation.x = -Math.PI / 2; pm.position.set(x, .02, z1 - 2.6); examG.add(pm);
+            }
+            /* chalkboard, LED countdown sign, wall clock, honour plaque, rules board */
+            const bg = new THREE.Group(); bg.position.set(cx, 0, z0 + .05); examG.add(bg);
+            sb(6.7, 2.65, .1, 0x4a2f1d, 0, 2.3, .05, bg); sb(6.9, .08, .22, 0x6b4630, 0, 1.0, .15, bg);
+            [-.4, 0, .5].forEach((x, i) => sb(.12, .025, .025, 0xffffff, x + 2, 1.05, .17, bg));
+            const bt = ctex(cvs(1024, 392, (c, w, h) => { const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, "#23382f"); g.addColorStop(1, "#182720"); c.fillStyle = g; c.fillRect(0, 0, w, h); for (let i = 0; i < 3000; i++) { c.fillStyle = `rgba(255,255,255,${Math.random() * .04})`; c.fillRect(Math.random() * w, Math.random() * h, 2 + Math.random() * 30, 1); } c.fillStyle = "#f1ecdf"; c.textAlign = "center"; c.font = "700 92px 'Playfair Display',Georgia,serif"; c.fillText("EXAM HALL", w / 2, 120); c.font = "700 76px Georgia,serif"; c.fillText("Good luck", w / 2, 220); c.font = "italic 34px Georgia,serif"; c.fillStyle = "rgba(241,236,223,.8)"; c.fillText("Silence · Phones off · Eyes on your own paper", w / 2, 300); c.fillText("Stay calm · read carefully · do your best ✦", w / 2, 352); }));
+            const bd = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 2.45), new THREE.MeshStandardMaterial({ map: bt, roughness: .95, emissive: 0xffffff, emissiveMap: bt, emissiveIntensity: .35 })); bd.position.set(0, 2.3, .11); bg.add(bd);
+            const sc = cvs(512, 160, () => { }); signCtx = sc.getContext("2d"); signTex = new THREE.CanvasTexture(sc); signTex.colorSpace = THREE.SRGBColorSpace;
+            sb(3.5, .8, .12, 0x2a1a10, 0, 4.05, .06, bg); { const s = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 3.3 * 160 / 512), new THREE.MeshBasicMaterial({ map: signTex })); s.position.set(0, 4.05, .13); bg.add(s); } drawSign("00:00:00", 0);
+            { const cg = new THREE.Group(); cg.position.set(cx - 5.3, 3.3, z0 + .08); examG.add(cg); const rim = cyl(.56, .56, .08, 0xc9a24a, 0, 0, 0, cg, GOLD); rim.rotation.x = Math.PI / 2;
+                const face = new THREE.Mesh(new THREE.CircleGeometry(.5, 40), new THREE.MeshBasicMaterial({ map: ctex(cvs(256, 256, (c, w, h) => { c.fillStyle = "#f6f0de"; c.beginPath(); c.arc(128, 128, 128, 0, 7); c.fill(); c.fillStyle = "#2a1a10"; c.textAlign = "center"; c.textBaseline = "middle"; c.font = "700 30px 'Playfair Display',Georgia,serif"; ["XII", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI"].forEach((t, i) => { const a = i / 12 * 6.283 - 1.5708; c.fillText(t, 128 + Math.cos(a) * 100, 128 + Math.sin(a) * 100); }); for (let i = 0; i < 60; i++) { const a = i / 60 * 6.283; c.fillRect(128 + Math.cos(a) * 120 - 1, 128 + Math.sin(a) * 120 - 1, 2, i % 5 ? 4 : 8); } })) })); face.position.z = .045; cg.add(face);
+                const mk = (len, w) => { const p = new THREE.Group(); p.position.z = .06; cg.add(p); const b = new THREE.Mesh(new THREE.BoxGeometry(w, len, .012), new THREE.MeshBasicMaterial({ color: 0x1a0f08 })); b.position.y = len / 2 - .04; p.add(b); return p; }; clockMin = mk(.4, .022); clockHr = mk(.28, .034); }
+            plate(2.2, .85, 512, 200, goldText("Honor Code", "Work with integrity"), cx + 5.3, 3.3, z0 + .06, 0, examG);
+            plate(3.4, 1.7, 512, 256, (c, w, h) => { c.fillStyle = "#efe6cf"; c.fillRect(0, 0, w, h); c.strokeStyle = "#6a1a2a"; c.lineWidth = 8; c.strokeRect(8, 8, w - 16, h - 16); c.fillStyle = "#2a1a10"; c.textAlign = "center"; c.font = "700 34px 'Playfair Display',Georgia,serif"; c.fillText("EXAM RULES", w / 2, 56); c.font = "22px Inter,Arial,sans-serif"; ["1 · Take your assigned seat", "2 · Silence phones and notes", "3 · Raise a hand for questions", "4 · Stop when the bell rings"].forEach((t, i) => c.fillText(t, w / 2, 100 + i * 36)); c.font = "700 24px Inter,Arial"; c.fillText("Stay calm and focused", w / 2, 238); }, x1 - .06, 2.6, cz, -Math.PI / 2, examG);
+            /* proctor dais, desk, leather chair, brass lamp, bell, hourglass */
+            sb(5.4, .18, 2.8, 0x3a2314, cx, .09, 5.3); sb(5.0, .1, .5, 0x4a2f1d, cx, .05, 7.0);
+            const py_ = .18; sb(2.7, .08, 1.05, 0x4a2f1d, cx, py_ + .8, 5.6); sb(2.4, .012, .78, 0x1f4a3a, cx, py_ + .85, 5.6); sb(2.5, .72, .9, 0x3a2314, cx, py_ + .38, 5.6);
+            [-.8, 0, .8].forEach(x => { sb(.7, .5, .02, 0x4a2f1d, cx + x, py_ + .42, 6.07); sb(.16, .03, .03, 0xc9a24a, cx + x, py_ + .56, 6.1, examG, GOLD); });
+            { const l = cyl(.012, .012, .5, 0xc9a24a, cx - 1.0, py_ + 1.12, 5.5, examG, GOLD); cyl(.1, .1, .03, 0xc9a24a, cx - 1.0, py_ + .87, 5.5, examG, GOLD); cyl(.06, .15, .2, 0xffe0a8, cx - 1.0, py_ + 1.42, 5.5, examG, { emissive: 0xffc46b, emissiveIntensity: 1.2 }); }
+            bellG = new THREE.Group(); bellG.position.set(cx + .85, py_ + .86, 5.5); examG.add(bellG); { cyl(.12, .12, .03, 0x2a1a10, 0, 0, 0, bellG); const bl = new THREE.Mesh(new THREE.LatheGeometry([[.001, .22], [.05, .21], [.1, .17], [.14, .08], [.17, .01], [.001, .01]].map(p => new THREE.Vector2(p[0] * 1, p[1])), 24), mat(0xd8b45a, { metalness: .9, roughness: .25, side: THREE.DoubleSide })); bl.position.y = .02; bellG.add(bl); cyl(.012, .012, .1, 0xd8b45a, 0, .27, 0, bellG, GOLD); }
+            { const hg = new THREE.Group(); hg.position.set(cx + .1, py_ + .86, 5.45); examG.add(hg); const gl = { color: 0xdfeaff, transparent: true, opacity: .35, roughness: .05 }; const c1 = new THREE.Mesh(new THREE.ConeGeometry(.07, .12, 16), mat(0xdfeaff, gl)); c1.position.y = .1; hg.add(c1); const c2 = c1.clone(); c2.rotation.x = Math.PI; c2.position.y = .22; hg.add(c2); cyl(.075, .075, .02, 0x6b4630, 0, .03, 0, hg); cyl(.075, .075, .02, 0x6b4630, 0, .29, 0, hg); const sand = new THREE.Mesh(new THREE.ConeGeometry(.05, .08, 12), mat(0xe9bf7c)); sand.position.y = .08; hg.add(sand); }
+            for (let k = 0; k < 4; k++)sb(.3 - k * .01, .012, .42, 0xf5f2ea, cx - .3 + k * .01, py_ + .86 + k * .012, 5.65).rotation.y = k * .12;
+            { const g = new THREE.Group(); g.position.set(cx, 0, 4.55); g.rotation.y = Math.PI; examG.add(g); fbox(.7, .14, .66, 0x4a2316, 0, .52 + py_, 0, g, .06); fbox(.7, 1.0, .14, 0x4a2316, 0, 1.05 + py_, .3, g, .08); tuft(g, -.2, 1.05 + py_, .225, 3, 3, .2, .2); [-.38, .38].forEach(s => fbox(.1, .3, .6, 0x4a2316, s, .72 + py_, 0, g, .04)); cyl(.04, .04, .4, 0x2a1a10, 0, .25 + py_, 0, g); }
+            /* student desks + chairs (instanced geometry, individual seat cushions) */
+            const GG0 = new THREE.Group(), cols = [-8.2, 0, 8.2], offs = [-.95, .95], rows = [7.2, 9.8, 12.4, 15.0, 17.6], dk = [];
+            cols.forEach(gc => offs.forEach(o => rows.forEach(rz => dk.push([cx + gc + o, rz]))));
+            inst(1.2, .05, .62, 0x8a5a36, dk.map(([x, z]) => [x, .77, z])); inst(.04, .74, .04, 0xc9a24a, dk.flatMap(([x, z]) => [[x - .55, .37, z - .26], [x + .55, .37, z - .26], [x - .55, .37, z + .26], [x + .55, .37, z + .26]]), GOLD);
+            inst(1.06, .03, .5, 0x4a2f1d, dk.map(([x, z]) => [x, .32, z])); inst(1.1, .38, .02, 0x5a3a24, dk.map(([x, z]) => [x, .55, z - .29])); inst(.3, .004, .42, 0xf7f4ec, dk.map(([x, z]) => [x - .14, .8, z + .02])); inst(.14, .012, .012, 0x15151a, dk.map(([x, z]) => [x + .2, .81, z + .08])); inst(.14, .02, .03, 0xd8b45a, dk.map(([x, z]) => [x, .74, z - .3]), GOLD);
+            inst(.5, .05, .5, 0x4a2e1c, dk.map(([x, z]) => [x, .43, z + .85])); inst(.035, .42, .035, 0x3a2314, dk.flatMap(([x, z]) => [[x - .22, .21, z + .63], [x + .22, .21, z + .63], [x - .22, .21, z + 1.07], [x + .22, .21, z + 1.07]]));
+            inst(.04, .64, .04, 0x4a2e1c, dk.flatMap(([x, z]) => [[x - .23, .77, z + 1.1], [x + .23, .77, z + 1.1]])); inst(.5, .06, .04, 0x4a2e1c, dk.map(([x, z]) => [x, 1.1, z + 1.1])); inst(.4, .3, .035, 0x2e5a4a, dk.map(([x, z]) => [x, .9, z + 1.06]));
+            dk.forEach(([x, z]) => { const m = fbox(.46, .07, .46, 0x2e5a4a, x, .5, z + .85, examG, .03, true); addSeat(GG0, x, z + .85, 0, m); solid(x, z, .5); });
+            /* pendant lamps, wall sconces, warm lights */
+            [-8, 0, 8].forEach(gx => [7.8, 13.2].forEach(zz => { const x = cx + gx; cyl(.01, .01, .9, 0xc9a24a, x, H - .45, zz, examG, GOLD); const sh = new THREE.Mesh(new THREE.ConeGeometry(.28, .22, 24, 1, true), mat(0x1f4a3a, { side: THREE.DoubleSide })); sh.position.set(x, H - 1.0, zz); examG.add(sh); const bu = new THREE.Mesh(new THREE.SphereGeometry(.09, 12, 10), new THREE.MeshStandardMaterial({ color: 0xfff1cf, emissive: 0xffd28a, emissiveIntensity: 2.2 })); bu.position.set(x, H - 1.04, zz); examG.add(bu); }));
+            [5, 9, 13, 17].forEach(z => { sb(.12, .3, .16, 0xc9a24a, x1 - .1, 2.5, z, examG, GOLD); const b = new THREE.Mesh(new THREE.SphereGeometry(.07, 10, 8), new THREE.MeshStandardMaterial({ color: 0xfff1cf, emissive: 0xffd28a, emissiveIntensity: 2 })); b.position.set(x1 - .2, 2.62, z); examG.add(b); });
+            [cx - 7, cx + 7].forEach(x => { const l = new THREE.PointLight(0xffd6a0, 9, 18, 2); l.position.set(x, 3.7, cz); scene.add(l); });
+            /* door frame + plaques (both sides) */
+            [12.4, 14.6].forEach(z => { sb(.5, 3.1, .22, 0xc9a24a, 12, 1.55, z + (z > 13.5 ? .11 : -.11), scene, GOLD); }); sb(.5, .22, 2.6, 0xc9a24a, 12, 3.2, 13.5, scene, GOLD);
+            plate(2.0, .8, 512, 200, goldText("EXAM HALL", "Silence please"), 11.82, 3.85, 13.5, -Math.PI / 2); plate(2.0, .8, 512, 200, goldText("QUIET PLEASE", "Exam in progress"), 12.18, 3.85, 13.5, Math.PI / 2, examG);
+        }
+        buildExam();
+
+        /* ---- personal bookshelf: metadata in localStorage, PDF files stored locally in IndexedDB ---- */
+        const BK_N = 12, myBooks = Array(BK_N).fill(null), bookFiles = new Map(), slots = []; let bkKey = "", bkTarget = -1;
+        const bookKey = () => { let id = "guest"; try { id = userId || "guest"; } catch { } return "focus_hall_books_" + id; };
+        const BOOK_DB = "focus_hall_pdf_store", BOOK_STORE = "pdfs";
+        let bookDbPromise = null;
+        function openBookDB() {
+            if (!("indexedDB" in window)) return Promise.reject(new Error("IndexedDB is unavailable"));
+            if (!bookDbPromise) bookDbPromise = new Promise((resolve, reject) => {
+                const req = indexedDB.open(BOOK_DB, 1);
+                req.onupgradeneeded = () => { const db = req.result; if (!db.objectStoreNames.contains(BOOK_STORE)) db.createObjectStore(BOOK_STORE); };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error || new Error("Could not open local PDF storage"));
+            });
+            return bookDbPromise;
+        }
+        async function putBookBlob(key, blob) {
+            const db = await openBookDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(BOOK_STORE, "readwrite"); tx.objectStore(BOOK_STORE).put(blob, key);
+                tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
+            });
+        }
+        async function getBookBlob(key) {
+            const db = await openBookDB();
+            return new Promise((resolve, reject) => {
+                const req = db.transaction(BOOK_STORE, "readonly").objectStore(BOOK_STORE).get(key);
+                req.onsuccess = () => resolve(req.result || null); req.onerror = () => reject(req.error);
+            });
+        }
+        async function deleteBookBlob(key) {
+            try {
+                const db = await openBookDB();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(BOOK_STORE, "readwrite"); tx.objectStore(BOOK_STORE).delete(key);
+                    tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+                });
+            } catch (e) { console.warn("Could not remove locally stored PDF:", e); }
+        }
+        const bookBlobKey = i => `${bkKey}:${i}`;
+        function setBookFile(i, blob, name) {
+            const old = bookFiles.get(i); if (old?.url) URL.revokeObjectURL(old.url);
+            bookFiles.set(i, { url: URL.createObjectURL(blob), name: name || myBooks[i]?.fileName || "Book.pdf" });
+        }
+        async function loadBooks() {
+            bkKey = bookKey(); myBooks.fill(null);
+            try { (JSON.parse(localStorage.getItem(bkKey) || "[]") || []).forEach((b, i) => { if (b && i < BK_N) myBooks[i] = b; }); } catch { }
+            bookFiles.forEach(f => f.url && URL.revokeObjectURL(f.url)); bookFiles.clear();
+            slots.forEach((_, i) => setBookVis(i)); renderBookList();
+            for (let i = 0; i < BK_N; i++) {
+                if (!myBooks[i]) continue;
+                try { const blob = await getBookBlob(bookBlobKey(i)); if (blob) setBookFile(i, blob, myBooks[i].fileName); }
+                catch (e) { console.warn("Could not restore PDF:", e); }
+            }
+            renderBookList();
+        }
+        function saveBooks() {
+            try { localStorage.setItem(bkKey, JSON.stringify(myBooks)); }
+            catch { setStatus("Could not save the bookshelf information in this browser.", true); }
+        }
+        function setBookVis(i) {
+            const s = slots[i], b = myBooks[i]; s.book.visible = !!b; s.hit.material.opacity = b ? 0 : .16; if (!b) return;
+            s.body.material.color.setHSL(b.hue / 360, .45, .26);
+            const t = ctex(cvs(64, 256, (c, w, h) => { c.fillStyle = `hsl(${b.hue},45%,30%)`; c.fillRect(0, 0, w, h); c.fillStyle = "#d8b45a";[10, 22, h - 22, h - 10].forEach(y => c.fillRect(4, y, w - 8, 2)); c.save(); c.translate(w / 2, h / 2); c.rotate(-Math.PI / 2); c.fillStyle = "#f5e6bd"; c.font = "700 22px Tahoma,Arial,sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; let tt = b.title; while (c.measureText(tt).width > h - 70 && tt.length > 3) tt = tt.slice(0, -2); if (tt !== b.title) tt += "…"; c.fillText(tt, 0, 0); c.restore(); }));
+            s.spine.material.map?.dispose(); s.spine.material.map = t; s.spine.material.needsUpdate = true;
+        }
+        function buildShelf() {
+            const g = new THREE.Group(); g.position.set(-11.35, 0, 13.6); g.rotation.y = Math.PI / 2; scene.add(g);
+            const S = (w, h, d, c, x, y, z, o) => sb(w, h, d, c, x, y, z, g, o);
+            S(1.76, 2.1, .04, 0x24170f, 0, 1.05, -.17); [-.88, .88].forEach(x => S(.07, 2.12, .38, 0x5a3a24, x, 1.06, 0)); [.1, .8, 1.5].forEach(y => S(1.76, .05, .38, 0x6b4630, 0, y, 0)); S(1.9, .08, .44, 0x4a2f1d, 0, 2.14, 0); S(1.82, .1, .4, 0x2a1a10, 0, .03, 0); S(1.7, .03, .03, 0xc9a24a, 0, 1.86, .19, GOLD);
+            plate(1.4, .3, 512, 110, (c, w, h) => { c.fillStyle = "#1c3a30"; c.fillRect(0, 0, w, h); c.strokeStyle = "#d8b45a"; c.lineWidth = 4; c.strokeRect(5, 5, w - 10, h - 10); c.fillStyle = "#f3d98e"; c.textAlign = "center"; c.font = "700 36px Tahoma,Arial,sans-serif"; c.fillText("My Books", w / 2, 70); }, 0, 2.38, .1, 0, g);
+            for (let r = 0; r < 2; r++)for (let k = 0; k < 6; k++) {
+                const x = -.675 + k * .27, y = (r ? .825 : .125) + .27, i = r * 6 + k;
+                const hit = new THREE.Mesh(new THREE.BoxGeometry(.25, .54, .3), new THREE.MeshBasicMaterial({ color: 0xe9bf7c, transparent: true, opacity: .16, depthWrite: false })); hit.position.set(x, y, .02); hit.userData.slot = i; g.add(hit);
+                const bk = new THREE.Group(); bk.position.set(x, y, .02); bk.rotation.z = (i % 5 === 3) ? .07 : 0; g.add(bk);
+                const body = new THREE.Mesh(new THREE.BoxGeometry(.21, .5, .3), new THREE.MeshStandardMaterial({ color: 0x6a3a2a, roughness: .6, bumpMap: GRAIN, bumpScale: .6 })); bk.add(body);
+                const spine = new THREE.Mesh(new THREE.PlaneGeometry(.21, .5), new THREE.MeshStandardMaterial({ roughness: .55 })); spine.position.z = .151; bk.add(spine);
+                slots.push({ hit, book: bk, body, spine }); bk.visible = false;
+            }
+            const lamp = new THREE.Group(); lamp.position.set(.55, 2.18, 0); g.add(lamp); cyl(.1, .12, .03, 0xc9a24a, 0, 0, 0, lamp, GOLD); cyl(.012, .012, .3, 0xc9a24a, 0, .16, 0, lamp, GOLD); cyl(.05, .13, .14, 0xffe0a8, 0, .36, 0, lamp, { emissive: 0xffc46b, emissiveIntensity: 1.3 });
+            solid(-10.85, 13.6, .9);
+        }
+        buildShelf(); loadBooks();
+        const hitMeshes = () => slots.map(s => s.hit);
+        const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+        const nearShelf = () => level === 0 && py < .5 && mySeat < 0 && Math.hypot(px + 10.9, pz - 13.6) < 3.4;
+        canvas.addEventListener("pointerdown", e => {
+            if (!nearShelf()) return;
+            if (document.pointerLockElement === canvas) ndc.set(0, 0); else { const r = canvas.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1); }
+            ray.setFromCamera(ndc, camera); ray.far = 6; const h = ray.intersectObjects(hitMeshes(), false)[0];
+            if (h) { document.exitPointerLock?.(); const i = h.object.userData.slot; myBooks[i] ? openBook(i) : openPanel("book", i); }
+        });
+        function openBook(i) {
+            const f = bookFiles.get(i);
+            if (f) { if (!window.open(f.url, "_blank")) setStatus("Popup blocked — press Open in the Books panel.", true); return; }
+            if (myBooks[i]) setStatus(`The saved PDF for “${myBooks[i].title}” is unavailable. Remove it and add the PDF again.`, true);
+        }
+        function renderBookList() {
+            const L = $("bookList"); if (!L) return; L.innerHTML = "";
+            myBooks.forEach((b, i) => { if (!b) return; const r = document.createElement("div"); r.className = "brow"; const f = bookFiles.get(i);
+                r.innerHTML = `<i style="background:hsl(${b.hue},45%,40%)"></i><span></span><button data-a="o">${f ? "Open" : "Restoring…"}</button><button data-a="x">✕</button>`; r.querySelector("span").textContent = b.title;
+                r.querySelector("[data-a=o]").disabled = !f; r.querySelector("[data-a=o]").onclick = () => openBook(i);
+                r.querySelector("[data-a=x]").onclick = async () => {
+                    myBooks[i] = null; const old = bookFiles.get(i); if (old?.url) URL.revokeObjectURL(old.url);
+                    bookFiles.delete(i); await deleteBookBlob(bookBlobKey(i)); saveBooks(); setBookVis(i); renderBookList();
+                };
+                L.appendChild(r);
+            });
+            if (!L.children.length) L.innerHTML = `<div class="xs">Your shelf is empty. Name a book and pick its PDF below.</div>`;
+        }
+        let pickedFile = null;
+        $("bookFile").onchange = e => { pickedFile = e.target.files[0] || null; $("bookFileName").textContent = pickedFile ? pickedFile.name : "Choose PDF from device…"; if (pickedFile && !$("bookTitle").value.trim()) $("bookTitle").value = pickedFile.name.replace(/\.pdf$/i, ""); };
+        $("bookAdd").onclick = async () => {
+            const t = $("bookTitle").value.trim(); if (!t || !pickedFile) { setStatus("Enter a book name and choose its PDF first.", true); return; }
+            let i = bkTarget >= 0 && !myBooks[bkTarget] ? bkTarget : myBooks.findIndex(b => !b); if (i < 0) { setStatus("The shelf is full — remove a book first.", true); return; }
+            const file = pickedFile;
+            try {
+                await putBookBlob(bookBlobKey(i), file);
+                myBooks[i] = { title: t, hue: (hueOf(t) * 7) % 360, fileName: file.name };
+                setBookFile(i, file, file.name); saveBooks(); setBookVis(i); renderBookList();
+                $("bookTitle").value = ""; pickedFile = null; $("bookFile").value = ""; $("bookFileName").textContent = "Choose PDF from device…"; bkTarget = -1;
+                setStatus(`“${t}” added. Its PDF is stored locally in this browser.`);
+            } catch (e) { console.error(e); setStatus("Could not save this PDF in local browser storage. Check available storage space.", true); }
+        };
+
+        /* ---- exam timer, bell, panels ---- */
+        const EXK = "focus_hall_exam"; let exam = null, examAC = null, lastShown = "";
+        try { exam = JSON.parse(localStorage.getItem(EXK) || "null"); } catch { }
+        const examLeft = () => exam ? Math.max(0, Math.ceil((exam.end - Date.now()) / 1000)) : 0;
+        function openPanel(k, slot = -1) { document.exitPointerLock?.(); $("examPanel").hidden = k !== "exam" ? true : !$("examPanel").hidden; $("bookPanel").hidden = k !== "book" ? true : (slot >= 0 ? false : !$("bookPanel").hidden); if (k === "book") { bkTarget = slot; renderBookList(); } }
+        $("examBtn").onclick = () => openPanel("exam"); $("bookBtn").onclick = () => openPanel("book");
+        document.querySelectorAll(".xpanel [data-close]").forEach(b => b.onclick = () => b.closest(".xpanel").hidden = true);
+        document.querySelectorAll("#examPre button").forEach(b => b.onclick = () => $("examMin").value = b.dataset.m);
+        function ringBell() {
+            const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+            try { examAC = examAC || new AC(); const a = examAC; a.resume?.(); const t0 = a.currentTime + .05, out = a.createGain(); out.gain.value = .5; out.connect(a.destination);
+                for (let k = 0; k < 3; k++) { const s = t0 + k * 1.8, g = a.createGain(); g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(1, s + .02); g.gain.setValueAtTime(1, s + 1.2); g.gain.exponentialRampToValueAtTime(.001, s + 1.7); g.connect(out);
+                    const am = a.createGain(); am.gain.value = .5; const lfo = a.createOscillator(); lfo.frequency.value = 24; const lg = a.createGain(); lg.gain.value = .5; lfo.connect(lg); lg.connect(am.gain); am.connect(g);
+                    [1245, 1760, 2489, 3322].forEach((f, i) => { const o = a.createOscillator(); o.type = i ? "sine" : "triangle"; o.frequency.value = f; const og = a.createGain(); og.gain.value = .35 / (i + 1); o.connect(og); og.connect(am); o.start(s); o.stop(s + 1.8); }); lfo.start(s); lfo.stop(s + 1.8); } } catch { }
+        }
+        $("examStart").onclick = () => {
+            const m = Math.min(600, Math.max(1, Math.floor(+$("examMin").value || 0))); if (!m) return;
+            try { const AC = window.AudioContext || window.webkitAudioContext; examAC = examAC || new AC(); examAC.resume?.(); } catch { }
+            exam = { end: Date.now() + m * 60000, total: m * 60 }; try { localStorage.setItem(EXK, JSON.stringify(exam)); } catch { } setStatus(`Exam started · ${m} min · good luck 🍀`); examUI();
+        };
+        $("examStop").onclick = () => { exam = null; try { localStorage.removeItem(EXK); } catch { } examUI(); setStatus("Exam cancelled."); };
+        function finishExam() {
+            exam = null; try { localStorage.removeItem(EXK); } catch { } bellT = performance.now(); ringBell(); flash(); navigator.vibrate?.([300, 150, 300, 150, 600]);
+            setStatus("⏰ Time is up! Put your pens down", true); $("examPanel").hidden = false; examUI(true);
+        }
+        function examUI(done) {
+            const left = examLeft(), run = !!exam, t = formatTime(left);
+            $("examBig").textContent = done ? "00:00:00" : t; $("examBar").style.width = run ? (100 * left / exam.total) + "%" : "0%";
+            $("examState").textContent = done ? "⏰ Time is up!" : run ? "Exam in progress" : "Set the duration, then start";
+            $("examStart").disabled = run; $("examStop").disabled = !run; $("examHud").hidden = !run || view !== "room"; $("examHudT").textContent = t;
+            const key = (done ? "d" : run ? "r" : "i") + t; if (key !== lastShown) { lastShown = key; drawSign(done ? "00:00:00" : run ? t : "00:00:00", done ? 2 : run ? 1 : 0); }
+        }
+        setInterval(() => { if (bkKey !== bookKey()) loadBooks(); if (exam && Date.now() >= exam.end) finishExam(); else examUI(); }, 250);
+        examUI();
+        let fcount = 0, ft = 16, prNow = Math.min(window.devicePixelRatio || 1, 2), prT = 0;
+        function extraTick(now, dt) {
+            examG.visible = level === 0 && px > 4.5;
+            const d = new Date(); if (clockMin) { clockMin.rotation.z = -(d.getMinutes() + d.getSeconds() / 60) / 60 * 6.283; clockHr.rotation.z = -((d.getHours() % 12) + d.getMinutes() / 60) / 12 * 6.283; }
+            if (bellG) { const e = (now - bellT) / 1000; bellG.rotation.z = e < 6 ? Math.sin(e * 45) * .28 * Math.max(0, 1 - e / 6) : 0; }
+            const inEx = level === 0 && px > 12.8 && view === "room", atSh = nearShelf() && view === "room";
+            $("examBtn").style.display = inEx ? "" : "none"; $("bookBtn").style.display = atSh ? "" : "none";
+            if (!inEx && !$("examPanel").hidden) $("examPanel").hidden = true; if (!atSh && !$("bookPanel").hidden) $("bookPanel").hidden = true;
+            if (level === 0 && py < .5 && mySeat < 0) {
+                const h = $("hint");
+                if (nearShelf()) h.textContent = "📚 Click a book to open its PDF · click a glowing slot to add one";
+                else if (px > 12.8) h.textContent = exam ? "Exam in progress · take a seat (E) · good luck 🍀" : "Exam Hall · take a seat (E) · set the timer with the Exam button";
+            }
+            ft += (dt * 1000 - ft) * .05;
+            if (now - prT > 4000) { const cap = Math.min(window.devicePixelRatio || 1, 2); let n = prNow; if (ft > 34 && prNow > 1) n = Math.max(1, prNow - .15); else if (ft < 19 && prNow < cap) n = Math.min(cap, prNow + .1); if (n !== prNow) { prNow = n; renderer.setPixelRatio(n); composer.setPixelRatio(n); composer.setSize(innerWidth, innerHeight); prT = now; ft = 17; } }
+        }
 
         /* ---- avatars ---- */
         function makeVid() {
@@ -2465,7 +2809,7 @@ const SKIN_BUMP = ctex(cvs(512, 512, c => {
                 return { l, k };
             };
             const legL = leg(-1), legR = leg(1);
-            if (F) add(new THREE.CylinderGeometry(.19, .34, .4, 64, 1, true), M(0xffffff, { map: plaid, side: THREE.DoubleSide, bumpMap: pleat, bumpScale: 2, roughness: .85 }), legs, 0, .76, 0, 1, 1, .9);
+            if (F) add(new THREE.CylinderGeometry(.19, .34, .4, 64, 1, true), M(0xffffff, { map: plaid, side: THREE.DoubleSide, bumpMap: pleat, bumpScale: 2, roughness: .85 }), upper, 0, .76, 0, 1, 1, .9);
             g.add(legs, upper);
             const lc = document.createElement("canvas"); lc.width = 384; lc.height = 80;
             const lt = new THREE.CanvasTexture(lc);
@@ -2527,7 +2871,7 @@ const SKIN_BUMP = ctex(cvs(512, 512, c => {
         }
 
         const blocked = (x, z) => {
-            if (level === 2) { if (x < -26.6 || x > -13.4 || z < -6.6 || z > 6.6) return true; } else if (x < BOUNDS.x0 || x > BOUNDS.x1 || z < BOUNDS.z0 || z > (level === 1 ? BOUNDS.z1 : BOUNDS.z1 + 6)) return true;
+            if (level === 2) { if (x < -26.6 || x > -13.4 || z < -6.6 || z > 6.6) return true; } else if (!inBounds(x, z)) return true;
             const si = stairInfo(x, z);
             // Keep the physical doorway sealed until the three-win requirement is met.
             const hasThreeWins = computeState(ownStats.rolls).wins >= REQUIRED_WINS;
@@ -2680,7 +3024,7 @@ const SKIN_BUMP = ctex(cvs(512, 512, c => {
             requestAnimationFrame(frame);
             const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
             if (!joined || view !== "room") return;
-            resize(); movePlayer(dt); updateWorld(dt); upTick(now, dt); placeCamera(); composer.render();
+            resize(); movePlayer(dt); updateWorld(dt); upTick(now, dt); extraTick(now, dt); placeCamera(); composer.render();
         }
         requestAnimationFrame(frame);
 
@@ -3164,7 +3508,7 @@ const SKIN_BUMP = ctex(cvs(512, 512, c => {
         function setView(v) {
             view = v; $("stage").classList.toggle("hide", v !== "room"); $("gameTab").classList.toggle("active", v === "game");
             document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.view === v));
-            ["camBtn", "screenBtn", "seatBtn"].forEach(id => $(id).style.display = v === "room" ? "" : "none");
+            ["camBtn", "screenBtn", "seatBtn"].forEach(id => $(id).style.display = v === "room" ? "" : "none"); if (v !== "room") { $("examPanel").hidden = true; $("bookPanel").hidden = true; $("examBtn").style.display = "none"; $("bookBtn").style.display = "none"; }
             $("gameBg").style.display = v === "game" ? "block" : "none";
             if (v !== "room") document.exitPointerLock?.();
             if (v === "game") renderLeaderboard();
